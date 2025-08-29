@@ -4,9 +4,9 @@ Written by ManchegoMike ([Twitch](https://www.twitch.tv/ManchegoMike)),
 based the "Scavenger" achievement
 in the original [Hardcore addon](https://www.curseforge.com/wow/addons/hardcore).
 
-The Scavenger Challenge is a hardcore (no deaths) self-found (no mail, no
-auction house) challenge whereby you have to rely solely on loot, not quest
-rewards, to get items throughout your journey to 60.
+The Scavenger Challenge is a hardcore self-found challenge whereby you have to
+rely solely on loot, not quest rewards, to get items throughout your journey to
+60.
 
 This addon warns you if you try to use/consume/equip an item unless you looted
 it from a mob, chest, or loot container, or crafted or conjured it yourself.
