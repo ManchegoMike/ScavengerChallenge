@@ -1,0 +1,9 @@
+## Interface: 11305
+## Title: Scavenger Challenge|cFF00FF00 1.0.0|r
+## Author: ManchegoMike
+## Notes: Hardcore, self-found, can't equip quest reward items, can't buy anything but spell reagents & gathering tools
+## Version: 0.1.0
+## RequiredDeps:
+## SavedVariablesPerCharacter: ScavengerUserData
+
+ScavengerChallenge.lua
