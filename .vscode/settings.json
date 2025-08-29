@@ -18,6 +18,7 @@
         "SlashCmdList",
         "UIErrorsFrame",
         "MERCHANT_ITEMS_PER_PAGE",
-        "MerchantFrame"
+        "MerchantFrame",
+        "LOOT_ITEM_SELF"
     ]
 }

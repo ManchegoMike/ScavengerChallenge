@@ -6,4 +6,6 @@
 ## RequiredDeps:
 ## SavedVariablesPerCharacter: ScavengerUserData
 
+localization.lua
+adapter.lua
 main.lua
