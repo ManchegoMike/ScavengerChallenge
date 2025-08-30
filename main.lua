@@ -16,7 +16,7 @@ local pdb = dbg and print or printnothing
 -- Frame/State -----------------------------------------------------------------
 
 local _initialized = false
-local _merchantPage = nil           -- current page (Wrath/Classic UI); nil when not at merchant
+local _currentMerchantPage = nil    -- current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
 local _targetingQuestNpc = false    -- toggled by quest events
 local _itemsInBags = {}             -- a table of all items in bags; when player gets a new item, this is checked to figure out which item is new
 
@@ -36,8 +36,8 @@ end
 function ns.initDB(force)
     if force or not ScavengerUserData then
         ScavengerUserData = {
-            AllowedItems = {},
             ForbiddenItems = {},
+            AllowedItems = {},
             Match = nil,
         }
     end
@@ -45,11 +45,11 @@ end
 
 -- Utility UI text -------------------------------------------------------------
 
-local function colorText(hex6, text) return "|cFF" .. hex6 .. text .. "|r" end
-local function info(text)    print(colorText('c0c0c0', L.prefix) .. colorText('ffffff', text)) end
-local function fail(text)    print(colorText('ff0000', L.prefix) .. colorText('ffffff', text)) end
-local function success(text) print(colorText('0080ff', L.prefix) .. colorText('00ff00', text)) end
-local function flash(text)   UIErrorsFrame:AddMessage(text, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8) end
+local function colorText(hex6, s)   return "|cFF" .. hex6 .. s .. "|r" end
+local function info(s)              print(colorText('c0c0c0', L.prefix) .. colorText('ffffff', s)) end
+local function fail(s)              print(colorText('ff0000', L.prefix) .. colorText('ffffff', s)) end
+local function success(s)           print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
+local function flash(s)             UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8) end
 
 -- Sound wrapper ---------------------------------------------------------------
 
@@ -57,38 +57,21 @@ local function playError()
     if _initialized then adapter:playSound(ERROR_SOUND_FILE) end
 end
 
--- Localization-safe loot pattern ----------------------------------------------
-
--- Build a pattern from WoW's LOOT_ITEM_PUSHED_SELF (e.g., "You receive item: %s.").
-local function buildLootPattern()
-    local gl = ScavengerUserData.Match or
-               (adapter.isWotLK and "Received item:" or LOOT_ITEM_PUSHED_SELF) or
-               "You receive item: %s."
-    -- Escape magic chars, then replace "%s" with "(.*)"
-    gl = gl:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])","%%%1")                                             pdb('"' .. gl .. '"')
-    gl = gl:gsub("%%%%s","(.*)")                                                                    pdb('"' .. gl .. '"')
-    return "^" .. gl .. "$"
-end
--- The above is only executed one time and stored here for future reference.
-local LOOT_PATTERN = ''
-
 -- Core init -------------------------------------------------------------------
 
 function ns.init()
     ns.initDB()
 
-    -- Seed initial allow/disallow like your original addon
     if ScavengerUserData.AllowedItems == nil or next(ScavengerUserData.AllowedItems) == nil then
         ScavengerUserData.AllowedItems = {}
-        for _,id in ipairs({1262,1939,1941,1942,2901,4471,6256,6529,6530,6532,7005}) do
+        -- Allow fishing pole (6256) & mounts
+        -- Sadly we can't query the WoW API about mounts. They return class 15 subclass 0, which is "junk".
+        for _,id in ipairs({6256,1132,2414,5655,5656,5665,5668,5864,5872,5873,8563,8588,8591,8592,8595,8629,8631,8632,13321,13322,13331,13332,13333,15277,15290,211498,211499,213170,216492,216570}) do
             ScavengerUserData.AllowedItems[id] = 1
         end
     end
     if ScavengerUserData.ForbiddenItems == nil or next(ScavengerUserData.ForbiddenItems) == nil then
         ScavengerUserData.ForbiddenItems = {}
-        for _,id in ipairs({11291}) do
-            ScavengerUserData.ForbiddenItems[id] = 1
-        end
     end
 
     adapter:after(2.0, function()
@@ -96,7 +79,6 @@ function ns.init()
         success(L.init_tip(colorText('ffd000', '/scav')))
         ns.initItemsInBags()
         ns.checkEquippedItems(true)
-        LOOT_PATTERN = buildLootPattern()                                                           pdb('LOOT_PATTERN: "' .. LOOT_PATTERN .. '"')
     end)
 end
 
@@ -172,43 +154,51 @@ function ns.checkEquippedItems(showMessageIfAllOk)
     end
 end
 
-function ns.initItemsInBags()                                                                       pdb("initItemsInBags")
+function ns.initItemsInBags()                                                                       --pdb("initItemsInBags")
     _itemsInBags = {}
     for bag = 0, NUM_BAG_SLOTS do
         local slots = adapter:getContainerNumSlots(bag)
         for slot = 1, slots do
             local id = adapter:getContainerItemId(bag, slot)
             if id then
-                _itemsInBags[id] = 1                                                                pdb(adapter:getContainerItemLink(bag, slot))
+                _itemsInBags[id] = 1                                                                --pdb(adapter:getContainerItemLink(bag, slot))
             end
         end
-    end                                                                                             pdb(" ")
+    end                                                                                             --pdb(" ")
 end
 
--- Merchant filtering (Wrath/Classic UI only) --------------------------------
+-- Merchant filtering (Wrath/Classic UI only) ----------------------------------
+
+local function showMerchantItem(id)
+    return ScavengerUserData.AllowedItems[id]
+end
+
 local function hideOrShowMerchantItems(pageNumber)
     -- Only attempt on classic-style Merchant UI (Retail’s new UI may not use these frames)
     if not pageNumber or not MERCHANT_ITEMS_PER_PAGE or not MerchantFrame then return end
 
     if pageNumber > 0 then
+        -- Hide all buttons
         for i = 1, MERCHANT_ITEMS_PER_PAGE do
             local btn = _G["MerchantItem" .. i]
             if btn then btn:Hide() end
         end
+        -- Show buttons for allowed items
         adapter:after(0.05, function()
             for i = 1, MERCHANT_ITEMS_PER_PAGE do
-                local idx = (pageNumber - 1) * MERCHANT_ITEMS_PER_PAGE + i
-                local link = GetMerchantItemLink(idx)
-                local btn  = _G["MerchantItem" .. i]
+                local index = (pageNumber - 1) * MERCHANT_ITEMS_PER_PAGE + i
+                local link = GetMerchantItemLink(index)
+                local btn = _G["MerchantItem" .. i]
                 if btn and link then
                     local id = adapter:parseItemLink(link)
-                    local allow = id and ( (not ScavengerUserData.ForbiddenItems[id]) and
-                                           (ScavengerUserData.AllowedItems[id] or adapter:itemIsReagent(id)) )
-                    if allow then btn:Show() end
+                    if showMerchantItem(id) then
+                        btn:Show()
+                    end
                 end
             end
         end)
-    else
+    else -- pageNumber <= 0 means the buyback tab
+         -- Show all buttons
         for i = 1, 12 do
             local btn = _G["MerchantItem" .. i]
             if btn then btn:Show() end
@@ -216,19 +206,19 @@ local function hideOrShowMerchantItems(pageNumber)
     end
 end
 
--- Event wiring --------------------------------------------------------------
+-- Event wiring ----------------------------------------------------------------
 
 local eventFrame = CreateFrame('Frame', ADDONNAME .. "_Events")
 
---eventFrame:SetScript('OnUpdate', function(self, elapsed)
---    if _merchantPage then
---        local page = (MerchantFrame and MerchantFrame.selectedTab == 1) and (MerchantFrame.page or -1) or -1
---        if page ~= _merchantPage then
---            _merchantPage = page
---            hideOrShowMerchantItems(page)
---        end
---    end
---end)
+eventFrame:SetScript('OnUpdate', function(self, elapsed)
+    if _currentMerchantPage then
+        local page = (MerchantFrame and MerchantFrame.selectedTab == 1) and (MerchantFrame.page or -1) or -1
+        if page ~= _currentMerchantPage then                                                        --pdb('PAGE', page)
+            _currentMerchantPage = page
+            hideOrShowMerchantItems(page)
+        end
+    end
+end)
 
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
@@ -267,11 +257,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == 'MERCHANT_SHOW' then
 
-        _merchantPage = 0
+        _currentMerchantPage = 0
 
     elseif event == 'MERCHANT_CLOSED' then
 
-        _merchantPage = nil
+        _currentMerchantPage = nil
 
     elseif event == 'QUEST_ACCEPTED' or
            event == 'QUEST_COMPLETE' or
@@ -283,36 +273,37 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == 'CHAT_MSG_LOOT' or
            event == 'BAG_UPDATE_DELAYED' or
-           event == 'QUEST_FINISHED' then                                                           pdb(event)
+           event == 'QUEST_FINISHED' then                                                           --pdb(event)
 
-        if event == 'QUEST_FINISHED' then _targetingQuestNpc = true end
-
-        local msg = ...
-        local isQuestContext = _targetingQuestNpc
-        adapter:after(0.3, function()
-            -- Look in bags for any item we haven't seen before in this session.
-            for bag = 0, NUM_BAG_SLOTS do
-                local slots = adapter:getContainerNumSlots(bag)
-                for slot = 1, slots do
-                    local id = adapter:getContainerItemId(bag, slot)
-                    if id and not _itemsInBags[id] then
-                        -- This is an item we haven't seen before in the bags.
-                        local link = adapter:getContainerItemLink(bag, slot)                        pdb("new item=", link, id)
-                        _itemsInBags[id] = 1                                                        pdb("isQuestContext=", isQuestContext)
-                        if isQuestContext then
-                            local isQuestItem = adapter:getContainerItemQuestInfo(bag, slot)        pdb("isQuestItem=", isQuestItem)
-                            if not isQuestItem then
-                                ScavengerUserData.ForbiddenItems[id] = 1
-                                _targetingQuestNpc = false
-                                fail(L.cannot_equip_s(link))
-                                flash(L.cannot_equip_s(link))
-                                playError()
+        if _initialized then
+            if event == 'QUEST_FINISHED' then _targetingQuestNpc = true end
+            local msg = ...
+            local isQuestContext = _targetingQuestNpc
+            adapter:after(0.3, function()
+                -- Look in bags for any item we haven't seen before in this session.
+                for bag = 0, NUM_BAG_SLOTS do
+                    local slots = adapter:getContainerNumSlots(bag)
+                    for slot = 1, slots do
+                        local id = adapter:getContainerItemId(bag, slot)
+                        if id and not _itemsInBags[id] then
+                            -- This is an item we haven't seen before in the bags.
+                            local link = adapter:getContainerItemLink(bag, slot)                    --pdb("new item=", link, id)
+                            _itemsInBags[id] = 1                                                    --pdb("isQuestContext=", isQuestContext)
+                            if isQuestContext then
+                                local isQuestItem = adapter:getContainerItemQuestInfo(bag, slot)    --pdb("isQuestItem=", isQuestItem)
+                                if not isQuestItem then
+                                    ScavengerUserData.ForbiddenItems[id] = 1
+                                    _targetingQuestNpc = false
+                                    fail(L.cannot_equip_s(link))
+                                    flash(L.cannot_equip_s(link))
+                                    playError()
+                                end
                             end
                         end
                     end
                 end
-            end
-        end)
+            end)
+        end
 
     end
 

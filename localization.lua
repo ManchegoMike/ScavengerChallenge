@@ -30,14 +30,11 @@ setmetatable(L, {
     end
 })
 
--- IMPORTANT: We do NOT hard-code "You receive item" here.
--- We will use the global LOOT_ITEM_SELF pattern at runtime for localization-safe parsing.
-
 -- English (enUS)
 ns["enUS"] = {
     title = "THE SCAVENGER CHALLENGE",
     prefix = "SCAVENGER: ", -- One space at the end
-    description = "Hardcore, self-found (no mail, no auction house, no trading), cannot use quest rewards, cannot buy from merchants except reagents and gathering tools.",
+    description = "Hardcore, self-found (no mail, no auction house, no trading), cannot use quest rewards, cannot buy anything from merchants except for a fishing pole and a level 40 mount.",
     help_header = "Commands:",
     help_allow  = "/scav allow {id/name/link}",
     help_allow_desc = "Allow an item you specify (by ID, name, or link).",
@@ -58,7 +55,7 @@ ns["enUS"] = {
 ns["deDE"] = {
     title = "DIE SCAVENGER-HERAUSFORDERUNG",
     prefix = "SCAVENGER: ",
-    description = "Hardcore, selbst gefunden (kein Post, kein Auktionshaus, kein Handel), keine Questbelohnung, keine Käufe bei Händlern außer Reagenzien und Sammelwerkzeugen.",
+    description = "Hardcore, selbst gefunden (kein Post, kein Auktionshaus, kein Handeln), keine Questbelohnungen, keine Käufe bei Händlern außer für eine Angelrute und ein Reittier ab Stufe 40.",
     help_header = "Befehle:",
     help_allow  = "/scav allow {id/name/link}",
     help_allow_desc = "Ermöglicht einen angegebenen Gegenstand (per ID, Name oder Link).",
@@ -79,7 +76,7 @@ ns["deDE"] = {
 ns["esES"] = {
     title = "EL DESAFÍO SCAVENGER",
     prefix = "SCAVENGER: ",
-    description = "Modo difícil, encontrado por uno mismo (sin correo, sin casa de subastas, sin comercio), no se pueden usar recompensas de misión, no se puede comprar a mercaderes salvo componentes y herramientas de recolección.",
+    description = "Hardcore, encontrado por ti mismo (sin correo, sin casa de subastas, sin intercambios), no se pueden usar recompensas de misiones, no se puede comprar nada a los comerciantes excepto una caña de pescar y una montura de nivel 40.",
     help_header = "Comandos:",
     help_allow  = "/scav allow {id/nombre/enlace}",
     help_allow_desc = "Permite un objeto especificado (por ID, nombre o enlace).",
@@ -100,7 +97,7 @@ ns["esES"] = {
 ns["frFR"] = {
     title = "LE DÉFI SCAVENGER",
     prefix = "SCAVENGER : ",
-    description = "Mode hardcore, trouvé soi-même (pas de courrier, pas d’hôtel des ventes, pas d’échanges), pas de récompense de quête, pas d’achat auprès des marchands sauf composants et outils de collecte.",
+    description = "Hardcore, trouvé par soi-même (pas de courrier, pas de maison de vente aux enchères, pas de commerce), impossible d'utiliser les récompenses de quête, impossible d'acheter quoi que ce soit chez les marchands sauf une canne à pêche et une monture de niveau 40.",
     help_header = "Commandes :",
     help_allow  = "/scav allow {id/nom/lien}",
     help_allow_desc = "Autorise un objet spécifié (par ID, nom ou lien).",
@@ -121,7 +118,7 @@ ns["frFR"] = {
 ns["itIT"] = {
     title = "LA SFIDA SCAVENGER",
     prefix = "SCAVENGER: ",
-    description = "Hardcore, trovato personalmente (niente posta, niente casa d’aste, niente scambi), non puoi usare ricompense di missioni, non puoi comprare dai mercanti tranne reagenti e strumenti di raccolta.",
+    description = "Hardcore, trovato da soli (niente posta, niente casa d'aste, niente scambi), non è possibile usare le ricompense delle missioni, non si può acquistare nulla dai mercanti tranne una canna da pesca e una cavalcatura di livello 40.",
     help_header = "Comandi:",
     help_allow  = "/scav allow {id/nome/link}",
     help_allow_desc = "Permetti un oggetto specificato (ID, nome o link).",
@@ -142,7 +139,7 @@ ns["itIT"] = {
 ns["ruRU"] = {
     title = "ВЫЗОВ SCAVENGER",
     prefix = "SCAVENGER: ",
-    description = "Хардкор, найдено самостоятельно (без почты, без аукциона, без обмена), нельзя использовать награды за задание, нельзя покупать у торговцев, кроме реагентов и инструментов сбора.",
+    description = "Хардкор, самостоятельно найдено (без почты, без аукциона, без обмена), нельзя использовать награды с квестов, нельзя покупать ничего у торговцев, кроме удочки и маунта 40 уровня.",
     help_header = "Команды:",
     help_allow  = "/scav allow {id/имя/ссылка}",
     help_allow_desc = "Разрешить указанный предмет (по ID, имени или ссылке).",
@@ -163,7 +160,7 @@ ns["ruRU"] = {
 ns["zhTW"] = {
     title = "拾荒者挑戰",
     prefix = "SCAVENGER：",
-    description = "硬核，自行獲得（無郵件、無拍賣場、無交易），不能使用任務獎勵，僅能購買施法材料與採集工具。",
+    description = "硬核，自行尋找（無郵件，無拍賣行，無交易），無法使用任務獎勳，無法向商人購買任何物品，除了釣魚竿和40級坐騎。",
     help_header = "指令：",
     help_allow  = "/scav allow {ID／名稱／連結}",
     help_allow_desc = "允許指定物品（依ID、名稱或連結）。",
@@ -184,7 +181,7 @@ ns["zhTW"] = {
 ns["koKR"] = {
     title = "수집가 도전",
     prefix = "수집가: ", -- One space at the end
-    description = "하드코어, 자급자족 (우편, 경매장, 거래 금지), 퀘스트 보상 사용 불가, 상인에게서는 재료와 채집 도구만 구매 가능.",
+    description = "하드코어, 자가 발견 (우편, 경매장, 거래 불가), 퀘스트 보상 사용 불가, 상인에게서 물건을 구매할 수 없으며 40레벨 탈것과 낚싯대만 구매 가능합니다.",
     help_header = "명령어:",
     help_allow  = "/scav allow {ID/이름/링크}",
     help_allow_desc = "ID, 이름 또는 링크로 지정한 아이템을 허용합니다.",
