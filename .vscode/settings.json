@@ -19,6 +19,8 @@
         "UIErrorsFrame",
         "MERCHANT_ITEMS_PER_PAGE",
         "MerchantFrame",
-        "LOOT_ITEM_SELF"
+        "LOOT_ITEM_SELF",
+        "LOOT_ITEM_PUSHED_SELF",
+        "NUM_BAG_SLOTS"
     ]
 }

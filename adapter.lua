@@ -1,13 +1,6 @@
---[[
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@                                                                              @@
-@@  Adapter                                                                     @@
-@@                                                                              @@
-@@  This allows using the same source code for both WoW Classic and older       @@
-@@  versions, such as WotLK 3.3.5 clients like you see in Project Epoch.        @@
-@@                                                                              @@
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-]]
+-- FILE: adapter.lua
+-- Allows using the same source code for both WoW Classic and older versions,
+-- such as WotLK 3.3.5 clients like you see in Project Epoch.
 
 local ADDONNAME, ns = ...
 if not ns then
@@ -20,6 +13,7 @@ ns.adapter = ns.adapter or {}
 local adapter = ns.adapter
 
 -- Feature detection -----------------------------------------------------------
+
 adapter.isModern  = false
 adapter.isWotLK   = false
 adapter.isVanilla = false
@@ -32,7 +26,8 @@ elseif type(UnitAura) == "function" then
     adapter.isWotLK = true
 end
 
--- Lightweight timer fallback (Wrath/Vanilla) ---------------------------------
+-- Lightweight timer fallback (Wrath/Vanilla) ----------------------------------
+
 local waitTable = {}
 local waitFrame = CreateFrame("Frame")
 waitFrame:SetScript("OnUpdate", function(self, elapsed)
@@ -58,6 +53,7 @@ function adapter:after(delay, func)
 end
 
 -- Debug table dump ------------------------------------------------------------
+
 function adapter:dumpTable(tbl)
     if type(DevTools_Dump) == 'function' then
         DevTools_Dump(tbl); print(' ')
@@ -80,9 +76,10 @@ function adapter:dumpTable(tbl)
     recursiveDump(tbl); print(' ')
 end
 
--- Bags (Retail/Wrath) ---------------------------------------------------------
+-- Bags ------------------------------------------------------------------------
+
 function adapter:getContainerNumSlots(bagIndex)
-    if C_Container then
+    if C_Container and type(C_Container.GetContainerNumSlots) == "function" then
         return C_Container.GetContainerNumSlots(bagIndex)
     else
         return GetContainerNumSlots(bagIndex)
@@ -90,14 +87,44 @@ function adapter:getContainerNumSlots(bagIndex)
 end
 
 function adapter:getContainerItemLink(bagIndex, slotIndex)
-    if C_Container then
+    if C_Container and type(C_Container.GetContainerItemLink) == "function" then
         return C_Container.GetContainerItemLink(bagIndex, slotIndex)
     else
         return GetContainerItemLink(bagIndex, slotIndex)
     end
 end
 
--- Sound playback (file or kit id / name) -------------------------------------
+function adapter:getContainerItemId(bagIndex, slotIndex)
+    if C_Container and type(C_Container.GetContainerItemID) == "function" then
+        return C_Container.GetContainerItemID(bagIndex, slotIndex)
+    else
+        return GetContainerItemID(bagIndex, slotIndex)
+    end
+end
+
+-- Return a consistent tuple: isQuestItem, questID, isActive
+function adapter:getContainerItemQuestInfo(bagIndex, slotIndex)
+    if C_Container and type(C_Container.GetContainerItemQuestInfo) == "function" then
+        local info = C_Container.GetContainerItemQuestInfo(bagIndex, slotIndex)
+        -- Retail normally returns a table; normalize to 3 values
+        if type(info) == "table" then
+            return info.isQuestItem or false, info.questID, info.isActive or false
+        else
+            -- Some builds return multiple values; pass them through
+            local isQuestItem, questID, isActive = info
+            return isQuestItem or false, questID, isActive or false
+        end
+    elseif type(GetContainerItemQuestInfo) == "function" then
+        -- Wrath/Classic
+        local isQuestItem, questID, isActive = GetContainerItemQuestInfo(bagIndex, slotIndex)
+        return isQuestItem or false, questID, isActive or false
+    else
+        return false, nil, false
+    end
+end
+
+-- Sound playback --------------------------------------------------------------
+
 function adapter:playSound(soundRef, channel)
     channel = channel or "Master"
     if type(soundRef) == "string" then
@@ -119,7 +146,8 @@ function adapter:playSound(soundRef, channel)
     end
 end
 
--- Merchant iteration helper (safe on Wrath; no-op on UIs without classic buttons)
+-- Merchant item iteration helper ----------------------------------------------
+
 function adapter:forEachMerchantItem(callback)
     if type(GetMerchantNumItems) ~= "function" then return end
     local num = GetMerchantNumItems()
@@ -130,18 +158,19 @@ function adapter:forEachMerchantItem(callback)
     end
 end
 
--- Item helpers ----------------------------------------------------------------
--- Extract id + plain name from a standard item link.
+-- Parse item link into id & text ----------------------------------------------
+
 function adapter:parseItemLink(link)
     if not link then return nil end
     local _, _, id, text = tostring(link):find(".*|.*|Hitem:(%d+):.*|h%[(.*)%]|h|r")
     return id and tonumber(id) or nil, text
 end
 
--- Reagent check across versions.
-function adapter:itemIsReagent(itemID)
-    if not itemID then return false end
-    local _, _, _, _, _, _, _, _, _, _, _, classId, subclassId = GetItemInfo(itemID)
+-- Reagent check ---------------------------------------------------------------
+
+function adapter:itemIsReagent(itemId)
+    if not itemId then return false end
+    local _, _, _, _, _, _, _, _, _, _, _, classId, subclassId = GetItemInfo(itemId)
     -- Retail Enum.* exists; Wrath doesn’t, but classId/subclassId numbers are stable:
     -- Reagent classId == 5; Miscellaneous (15) + Reagent subclass (1)
     if classId == 5 then return true end
@@ -149,15 +178,35 @@ function adapter:itemIsReagent(itemID)
     return false
 end
 
--- Talents / Professions (not directly used by Scavenger today, but handy) -----
-function adapter:getNumPrimaryProfessions()
-    if type(GetNumPrimaryProfessions) == 'function' then
-        return GetNumPrimaryProfessions()
+-- Find an item in the player's bags -------------------------------------------
+
+function adapter:findItemIdInBags(itemId)
+    for bag = 0, NUM_BAG_SLOTS do
+        local slots = adapter:getContainerNumSlots(bag)
+        for slot = 1, slots do
+            local link = adapter:getContainerItemLink(bag, slot)
+            if link then
+                local id, name = adapter:parseItemLink(link)
+                if id then
+                    if id == itemId then
+                        return bag, slot
+                    end
+                end
+            end
+        end
     end
-    if type(GetProfessions) == "function" then
-        local p1, p2 = GetProfessions()
-        local n = 0; if p1 then n = n + 1 end; if p2 then n = n + 1 end
-        return n
+    return nil
+end
+
+function adapter:findItemLinkInBags(itemLink)
+    for bag = 0, NUM_BAG_SLOTS do
+        local slots = adapter:getContainerNumSlots(bag)
+        for slot = 1, slots do
+            local link = adapter:getContainerItemLink(bag, slot)
+            if link and link == itemLink then
+                return bag, slot
+            end
+        end
     end
-    return 0
+    return nil
 end

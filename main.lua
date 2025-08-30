@@ -1,3 +1,5 @@
+-- FILE: main.lua
+
 local ADDONNAME, ns = ...
 if not ns then
     _G[ADDONNAME] = _G[ADDONNAME] or {}
@@ -7,22 +9,29 @@ end
 local L = ns.L
 local adapter = ns.adapter
 
--- Frame/State ---------------------------------------------------------------
-local scav = CreateFrame('Frame', ADDONNAME .. "_Frame")
+local dbg = true -- This should only be true if debugging.
+local function printnothing() end
+local pdb = dbg and print or printnothing
+
+-- Frame/State -----------------------------------------------------------------
+
 local _initialized = false
 local _merchantPage = nil         -- current page (Wrath/Classic UI); nil when not at merchant
 local _targetingQuestNpc = false  -- toggled by quest events
 
--- Constants ----------------------------------------------------------------
+-- Constants -------------------------------------------------------------------
+
 local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.wav"
 
--- Slash Commands ------------------------------------------------------------
+-- Slash Commands --------------------------------------------------------------
+
 SLASH_SCAVENGERCHALLENGE1, SLASH_SCAVENGERCHALLENGE2 = '/scavenger', '/scav'
 SlashCmdList["SCAVENGERCHALLENGE"] = function(str)
     ns.parseCommand(str)
 end
 
--- SavedVariables init -------------------------------------------------------
+-- SavedVariables init ---------------------------------------------------------
+
 function ns.initDB(force)
     if force or not ScavengerUserData then
         ScavengerUserData = {
@@ -32,30 +41,35 @@ function ns.initDB(force)
     end
 end
 
--- Utility UI text -----------------------------------------------------------
+-- Utility UI text -------------------------------------------------------------
+
 local function colorText(hex6, text) return "|cFF" .. hex6 .. text .. "|r" end
 local function info(text)    print(colorText('c0c0c0', L.prefix) .. colorText('ffffff', text)) end
 local function fail(text)    print(colorText('ff0000', L.prefix) .. colorText('ffffff', text)) end
 local function success(text) print(colorText('0080ff', L.prefix) .. colorText('00ff00', text)) end
 local function flash(text)   UIErrorsFrame:AddMessage(text, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8) end
 
--- Sound wrapper -------------------------------------------------------------
+-- Sound wrapper ---------------------------------------------------------------
+
 local function playError()
     if _initialized then adapter:playSound(ERROR_SOUND_FILE) end
 end
 
--- Localization-safe loot pattern -------------------------------------------
--- Build a pattern from LOOT_ITEM_SELF (e.g., "You receive item: %s.")
-local function buildLootSelfPattern()
-    local gl = LOOT_ITEM_SELF or "You receive item: %s."
+-- Localization-safe loot pattern ----------------------------------------------
+
+-- Build a pattern from WoW's LOOT_ITEM_PUSHED_SELF (e.g., "You receive item: %s.").
+local function buildLootPattern()
+    local gl = LOOT_ITEM_PUSHED_SELF or "You receive item: %s."
     -- Escape magic chars, then replace "%s" with "(.*)"
     gl = gl:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])","%%%1")
     gl = gl:gsub("%%%%s","(.*)")
     return "^" .. gl .. "$"
 end
-local LOOT_SELF_PATTERN = buildLootSelfPattern()
+-- The above is only executed one time and stored here for future reference.
+local LOOT_PATTERN = buildLootPattern()                                                             --pdb('LOOT_PATTERN: "' .. LOOT_PATTERN .. '"')
 
--- Core init -----------------------------------------------------------------
+-- Core init -------------------------------------------------------------------
+
 function ns.init()
     ns.initDB()
 
@@ -76,11 +90,12 @@ function ns.init()
     adapter:after(2.0, function()
         _initialized = true
         success(L.init_tip(colorText('ffd000', '/scav')))
-        ns.checkInventory()
+        ns.checkEquippedItems(true)
     end)
 end
 
--- Command parsing -----------------------------------------------------------
+-- Command parsing -------------------------------------------------------------
+
 function ns.parseCommand(str)
     local _, _, arg1 = str:find("^allow +(.*)$")
     if arg1 then ns.allowOrDisallowItem(arg1, true, true); return end
@@ -97,7 +112,8 @@ function ns.parseCommand(str)
     print(' ')
 end
 
--- Item helpers --------------------------------------------------------------
+-- Item helpers ----------------------------------------------------------------
+
 function ns.allowOrDisallowItem(itemStr, allow, userCommand)
     local name, link = GetItemInfo(itemStr)
     if not name then
@@ -122,8 +138,9 @@ function ns.allowOrDisallowItem(itemStr, allow, userCommand)
     return true
 end
 
--- Inventory checks ----------------------------------------------------------
-function ns.inventoryWarnings()
+-- Equipped item checks --------------------------------------------------------
+
+function ns.equippedItemsWarnings()
     local msgs = {}
     for slot = 1, 18 do
         local itemId = GetInventoryItemID('player', slot)
@@ -135,10 +152,10 @@ function ns.inventoryWarnings()
     return msgs
 end
 
-function ns.checkInventory()
-    local msgs = ns.inventoryWarnings()
+function ns.checkEquippedItems(showMessageIfAllOk)
+    local msgs = ns.equippedItemsWarnings()
     if #msgs == 0 then
-        success(L.all_ok)
+        if showMessageIfAllOk then success(L.all_ok) end
     else
         for _, msg in ipairs(msgs) do fail(msg) end
         if #msgs == 1 then flash(msgs[1]) else flash(L.unequip_n_quest_items(#msgs)) end
@@ -156,7 +173,7 @@ local function hideOrShowMerchantItems(pageNumber)
             local btn = _G["MerchantItem" .. i]
             if btn then btn:Hide() end
         end
-        adapter:after(0.3, function()
+        adapter:after(0.05, function()
             for i = 1, MERCHANT_ITEMS_PER_PAGE do
                 local idx = (pageNumber - 1) * MERCHANT_ITEMS_PER_PAGE + i
                 local link = GetMerchantItemLink(idx)
@@ -178,7 +195,10 @@ local function hideOrShowMerchantItems(pageNumber)
 end
 
 -- Event wiring --------------------------------------------------------------
-scav:SetScript('OnUpdate', function(self, elapsed)
+
+local eventFrame = CreateFrame('Frame', ADDONNAME .. "_Events")
+
+eventFrame:SetScript('OnUpdate', function(self, elapsed)
     if _merchantPage then
         local page = (MerchantFrame and MerchantFrame.selectedTab == 1) and (MerchantFrame.page or -1) or -1
         if page ~= _merchantPage then
@@ -188,58 +208,82 @@ scav:SetScript('OnUpdate', function(self, elapsed)
     end
 end)
 
-scav:RegisterEvent("PLAYER_LOGIN")
-scav:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-scav:RegisterEvent("MERCHANT_SHOW")
-scav:RegisterEvent("MERCHANT_CLOSED")
-scav:RegisterEvent("QUEST_ACCEPTED")
-scav:RegisterEvent("QUEST_TURNED_IN")
-scav:RegisterEvent("QUEST_DETAIL")
-scav:RegisterEvent("QUEST_PROGRESS")
-scav:RegisterEvent("QUEST_COMPLETE")
-scav:RegisterEvent("PLAYER_TARGET_CHANGED")
-scav:RegisterEvent("CHAT_MSG_LOOT")
+eventFrame:RegisterEvent("PLAYER_LOGIN")
+eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+eventFrame:RegisterEvent("MERCHANT_SHOW")
+eventFrame:RegisterEvent("MERCHANT_CLOSED")
+eventFrame:RegisterEvent("QUEST_ACCEPTED")
+eventFrame:RegisterEvent("QUEST_TURNED_IN")
+eventFrame:RegisterEvent("QUEST_DETAIL")
+eventFrame:RegisterEvent("QUEST_PROGRESS")
+eventFrame:RegisterEvent("QUEST_COMPLETE")
+eventFrame:RegisterEvent("CHAT_MSG_LOOT")
 
-scav:SetScript("OnEvent", function(self, event, ...)
+eventFrame:SetScript("OnEvent", function(self, event, ...)
+
     if event == 'PLAYER_LOGIN' then
+
         ns.init()
 
     elseif event == 'PLAYER_EQUIPMENT_CHANGED' then
-        adapter:after(0.3, ns.checkInventory)
+
+        adapter:after(0.3, ns.checkEquippedItems)
+
+    elseif event == 'PLAYER_TARGET_CHANGED' then -- This fires before MERCHANT_xxx or QUEST_xxx.
+
+        _targetingQuestNpc = false
+
+    elseif event == 'PLAYER_REGEN_DISABLED' then -- Player is entering combat
+
+        adapter:after(.3, function()
+            ns.checkEquippedItems()
+        end)
 
     elseif event == 'MERCHANT_SHOW' then
+
         _merchantPage = 0
 
     elseif event == 'MERCHANT_CLOSED' then
+
         _merchantPage = nil
 
     elseif event == 'QUEST_ACCEPTED' or event == 'QUEST_TURNED_IN' or
            event == 'QUEST_COMPLETE' or event == 'QUEST_DETAIL' or
            event == 'QUEST_PROGRESS' then
-        _targetingQuestNpc = true
 
-    elseif event == 'PLAYER_TARGET_CHANGED' then
-        -- This fires before MERCHANT_xxx or QUEST_xxx.
-        _targetingQuestNpc = false
+            _targetingQuestNpc = true
 
     elseif event == 'CHAT_MSG_LOOT' then
+
         local msg = ...
         local isQuestContext = _targetingQuestNpc
         adapter:after(0.3, function()
-            -- Match localized "You receive item: %s." using LOOT_ITEM_SELF.
-            local _, _, link = string.find(msg or "", LOOT_SELF_PATTERN)
-            if link then
-                if isQuestContext then
-                    local itemId = adapter:parseItemLink(link)
+            -- Match localized "You receive item: %s." using LOOT_ITEM_PUSHED_SELF.
+            local _, _, itemLink = string.find(msg or "", LOOT_PATTERN)
+            if itemLink then                                                                        pdb("matched pattern for ", itemLink)
+                if isQuestContext then                                                              pdb("isQuestContext")
+                    local itemId = adapter:parseItemLink(itemLink)                                  pdb("itemId=", itemId)
                     if itemId then
-                        ScavengerUserData.ForbiddenItems[itemId] = 1
-                        _targetingQuestNpc = false
-                        fail(L.cannot_equip_s(link))
-                        flash(L.cannot_equip_s(link))
-                        playError()
+                        adapter:after(1.0, function()
+                            local bag, slot = adapter:findItemLinkInBags(itemLink)
+                            if bag and slot then
+                                local isQuestItem = adapter:getContainerItemQuestInfo(bag, slot)    pdb("isQuestItem=", isQuestItem)
+                                if not isQuestItem then
+                                    ScavengerUserData.ForbiddenItems[itemId] = 1
+                                    _targetingQuestNpc = false
+                                    fail(L.cannot_equip_s(itemLink))
+                                    flash(L.cannot_equip_s(itemLink))
+                                    playError()
+                                end
+                            end
+                        end)
                     end
                 end
             end
         end)
+
     end
+
 end)
