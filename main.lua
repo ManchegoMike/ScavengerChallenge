@@ -16,9 +16,9 @@ local pdb = dbg and print or printnothing
 -- Frame/State -----------------------------------------------------------------
 
 local _initialized = false
-local _currentMerchantPage = nil    -- current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
-local _targetingQuestNpc = false    -- toggled by quest events
-local _itemsInBags = {}             -- a table of all items in bags; when player gets a new item, this is checked to figure out which item is new
+local _currentMerchantPage = nil    -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
+local _targetingQuestNpc = false    -- Toggled by quest events
+local _itemsInBags = {}             -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
 
 -- Constants -------------------------------------------------------------------
 
@@ -275,6 +275,20 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
            event == 'BAG_UPDATE_DELAYED' or
            event == 'QUEST_FINISHED' then                                                           --pdb(event)
 
+        -- QUEST_FINISHED is the only event that works for Project Epoch in
+        -- terms of catching when the player has received a quest item.
+        -- Strangely, when you get a quest item, not only does it *not* say
+        -- "You receive item: ____" (it says "Received item: ___", which is
+        -- non-standard), but it also doesn't fire any other QUEST_ event,
+        -- nor CHAT_MSG_LOOT or BAG_UPDATE_DELAYED. I mean, it's adding an item
+        -- to the bags: how does it not fire the event? Since there's no way
+        -- to parse which item came in, we have to remember everything that's
+        -- in the bags, then compare it to what's there now, and do processing
+        -- on every newly found item. Like a lot of things in programming,
+        -- being forced to do it this way by a wacky API actually makes the
+        -- code better in the long run, since we're no longer doing backflips
+        -- to parse "You receive item: ____" in various languages.
+
         if _initialized then
             if event == 'QUEST_FINISHED' then _targetingQuestNpc = true end
             local msg = ...
@@ -287,9 +301,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                         local id = adapter:getContainerItemId(bag, slot)
                         if id and not _itemsInBags[id] then
                             -- This is an item we haven't seen before in the bags.
-                            local link = adapter:getContainerItemLink(bag, slot)                    --pdb("new item=", link, id)
-                            _itemsInBags[id] = 1                                                    --pdb("isQuestContext=", isQuestContext)
+                            _itemsInBags[id] = 1                                                    --pdb("isQuestContext")
                             if isQuestContext then
+                                local link = adapter:getContainerItemLink(bag, slot)                --pdb("new item=", link, id)
                                 local isQuestItem = adapter:getContainerItemQuestInfo(bag, slot)    --pdb("isQuestItem=", isQuestItem)
                                 if not isQuestItem then
                                     ScavengerUserData.ForbiddenItems[id] = 1
