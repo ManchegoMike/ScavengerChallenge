@@ -303,6 +303,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                             -- This is an item we haven't seen before in the bags.
                             _itemsInBags[id] = 1                                                    --pdb("isQuestContext")
                             if isQuestContext then
+                                -- Here we check if the item is a quest item,
+                                -- which means it's something required for the
+                                -- quest, and is not a quest reward. If it isn't
+                                -- a quest item, it's a (forbidden) reward.
                                 local link = adapter:getContainerItemLink(bag, slot)                --pdb("new item=", link, id)
                                 local isQuestItem = adapter:getContainerItemQuestInfo(bag, slot)    --pdb("isQuestItem=", isQuestItem)
                                 if not isQuestItem then
