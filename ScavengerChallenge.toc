@@ -1,8 +1,8 @@
 ## Interface: 30300
-## Title: Scavenger Challenge|cFF00FF00 2.0.0|r
+## Title: Scavenger Challenge|cFF00FF00 2.0.1|r
 ## Author: ManchegoMike
-## Notes: Hardcore, self-found, can't equip quest reward items, can't buy anything but spell reagents & gathering tools
-## Version: 2.0.0
+## Notes: Hardcore, self-found, can't equip quest reward items, can't buy anything except a fishing pole and a level 40 mount
+## Version: 2.0.1
 ## RequiredDeps:
 ## SavedVariablesPerCharacter: ScavengerUserData
 
