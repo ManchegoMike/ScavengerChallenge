@@ -65,7 +65,7 @@ function ns.init()
     if ScavengerUserData.AllowedItems == nil or next(ScavengerUserData.AllowedItems) == nil then
         ScavengerUserData.AllowedItems = {}
         -- Allow fishing pole (6256) & mounts
-        -- Sadly we can't query the WoW API about mounts. They return class 15 subclass 0, which is "junk".
+        -- Sadly we can't query the WoW API about mounts. They return class 15 subclass 0, which is "junk", so we have to check for them all individually.
         for _,id in ipairs({6256,1132,2414,5655,5656,5665,5668,5864,5872,5873,8563,8588,8591,8592,8595,8629,8631,8632,13321,13322,13331,13332,13333,15277,15290,211498,211499,213170,216492,216570}) do
             ScavengerUserData.AllowedItems[id] = 1
         end

@@ -166,18 +166,6 @@ function adapter:parseItemLink(link)
     return id and tonumber(id) or nil, text
 end
 
--- Reagent check ---------------------------------------------------------------
-
-function adapter:itemIsReagent(itemId)
-    if not itemId then return false end
-    local _, _, _, _, _, _, _, _, _, _, _, classId, subclassId = GetItemInfo(itemId)
-    -- Retail Enum.* exists; Wrath doesn’t, but classId/subclassId numbers are stable:
-    -- Reagent classId == 5; Miscellaneous (15) + Reagent subclass (1)
-    if classId == 5 then return true end
-    if classId == 15 and subclassId == 1 then return true end
-    return false
-end
-
 -- Find an item in the player's bags -------------------------------------------
 
 function adapter:findItemIdInBags(itemId)
