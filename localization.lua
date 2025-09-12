@@ -49,6 +49,14 @@ ns["enUS"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") now allowed" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") now disallowed" end,
     cannot_equip_s = function(link) return "You cannot use " .. link end,
+    id_name_link = "id/name/link",
+    currently_on = "currently ON",
+    currently_off = "currently OFF",
+    help_hearth  = "/scav hearth [on/off]",
+    help_hearth_desc = "Allow or disallow having a hearthstone in your bags.",
+    no_hearth = "You must destroy your hearthstone",
+    hearth_on = "Hearthing is now allowed",
+    hearth_off = "Hearthing is now forbidden",
 }
 
 -- German (deDE)

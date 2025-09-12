@@ -23,6 +23,7 @@ local _itemsInBags = {}             -- A table of all items in bags; when player
 -- Constants -------------------------------------------------------------------
 
 local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.wav"
+local HEARTHSTONE_ID = 6948
 
 -- Slash Commands --------------------------------------------------------------
 
@@ -34,13 +35,10 @@ end
 -- SavedVariables init ---------------------------------------------------------
 
 function ns.initDB(force)
-    if force or not ScavengerUserData then
-        ScavengerUserData = {
-            ForbiddenItems = {},
-            AllowedItems = {},
-            Match = nil,
-        }
-    end
+    if force or ScavengerUserData == nil then ScavengerUserData = {} end
+    if ScavengerUserData.ForbiddenItems == nil then ScavengerUserData.ForbiddenItems = {} end
+    if ScavengerUserData.AllowedItems == nil then ScavengerUserData.AllowedItems = {} end
+    if ScavengerUserData.AllowHearth == nil then ScavengerUserData.AllowHearth = true end
 end
 
 -- Utility UI text -------------------------------------------------------------
@@ -91,15 +89,44 @@ function ns.parseCommand(str)
     _, _, arg1 = str:find("^disallow +(.*)$")
     if arg1 then ns.allowOrDisallowItem(arg1, false, true); return end
 
-    _, _, arg1 = str:find("^match +(.*)$")
-    if arg1 then ns.allowOrDisallowItem(arg1, false, true); return end
+    local function setHearth(tf)
+        if tf == nil then
+            ScavengerUserData.AllowHearth = not ScavengerUserData.AllowHearth
+        else
+            ScavengerUserData.AllowHearth = tf
+        end
+        if ScavengerUserData.AllowHearth then
+            success(L.hearth_on)
+        else
+            success(L.hearth_off)
+            ns.checkBags()
+        end
+    end
+
+    p1, p2, match = str:find("^hearth *(%a*)$")
+    if p1 then
+        match = match:lower()
+        if match == 'on' then
+            setHearth(true)
+        elseif match == 'off' then
+            setHearth(false)
+        else
+            setHearth(nil)
+        end
+        return
+    end
+
+    local function currentlyOnOrOff(tf)
+        return " (" .. (tf and L.currently_on or L.currently_off) .. ")"
+    end
 
     print(' ')
     print(colorText('ff8000', L.title))
     print(L.description)
     print(' ')
-    print(colorText('ffff00', L.help_allow));       print("   " .. L.help_allow_desc)
-    print(colorText('ffff00', L.help_disallow));    print("   " .. L.help_disallow_desc)
+    print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}"))        print("   " .. L.help_allow_desc)
+    print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}"))     print("   " .. L.help_disallow_desc)
+    print(colorText('ffff00', "/scav hearth [on/off]"))                         print("   " .. L.help_hearth .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
     print(' ')
 end
 
@@ -162,6 +189,19 @@ function ns.initItemsInBags()                                                   
             local id = adapter:getContainerItemId(bag, slot)
             if id then
                 _itemsInBags[id] = 1                                                                --pdb(adapter:getContainerItemLink(bag, slot))
+            end
+        end
+    end                                                                                             --pdb(" ")
+end
+
+function ns.checkBags()                                                                             --pdb("checkBags")
+    _itemsInBags = {}
+    for bag = 0, NUM_BAG_SLOTS do
+        local slots = adapter:getContainerNumSlots(bag)
+        for slot = 1, slots do
+            local id = adapter:getContainerItemId(bag, slot)
+            if id and id == HEARTHSTONE_ID then
+                fail(L.no_hearth)
             end
         end
     end                                                                                             --pdb(" ")
@@ -320,6 +360,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                         end
                     end
                 end
+                ns.checkBags()
             end)
         end
 

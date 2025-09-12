@@ -33,7 +33,7 @@ $action = {
     $name = $Event.SourceEventArgs.Name
     $ext = [System.IO.Path]::GetExtension($name).ToLower()
 
-    if ($ext -eq ".lua" -or $ext -eq ".md") {
+    if ($ext -eq ".lua" -or $ext -eq ".toc" -or $ext -eq ".md") {
 
         $now = Get-Date
         $last = $lastCopied[$path]

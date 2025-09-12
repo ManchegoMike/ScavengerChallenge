@@ -1,4 +1,4 @@
-## Interface: 30300
+## Interface: 11507
 ## Title: Scavenger Challenge|cFF00FF00 2.0.1|r
 ## Author: ManchegoMike
 ## Notes: Hardcore, self-found, can't equip quest reward items, can't buy anything except a fishing pole and a level 40 mount
@@ -8,4 +8,4 @@
 
 localization.lua
 adapter.lua
-main.lua
+ScavengerChallenge.lua
