@@ -16,6 +16,8 @@ local pdb = dbg and print or printnothing
 -- Frame/State -----------------------------------------------------------------
 
 local _initialized = false
+local _allowMail = false
+local _allowTrade = false
 local _currentMerchantPage = nil    -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
 local _targetingQuestNpc = false    -- Toggled by quest events
 local _itemsInBags = {}             -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
@@ -144,6 +146,28 @@ function ns.parseCommand(str)
         return
     end
 
+    p1, p2, match = str:find("^mail$")
+    if p1 then
+        _allowMail = true
+        success(L.mail_activated)
+        adapter:after(60, function()
+            _allowMail = false
+            fail(L.mail_deactivated)
+        end)
+        return
+    end
+
+    p1, p2, match = str:find("^trade$")
+    if p1 then
+        _allowTrade = true
+        success(L.trade_activated)
+        adapter:after(60, function()
+            _allowTrade = false
+            fail(L.trade_deactivated)
+        end)
+        return
+    end
+
     local function currentlyOnOrOff(tf)
         return " (" .. (tf and L.currently_on or L.currently_off) .. ")"
     end
@@ -152,10 +176,12 @@ function ns.parseCommand(str)
     print(colorText('ff8000', L.title))
     print(L.description)
     print(' ')
-    print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}"))        print("   " .. L.help_allow_desc)
-    print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}"))     print("   " .. L.help_disallow_desc)
-    print(colorText('ffff00', "/scav hearth [on/off]"))                         print("   " .. L.help_hearth .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
-    print(colorText('ffff00', "/scav bank [on/off]"))                           print("   " .. L.help_bank .. currentlyOnOrOff(ScavengerUserData.AllowBank))
+    print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}")         .. " - " .. L.help_allow_desc)
+    print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}")      .. " - " .. L.help_disallow_desc)
+    print(colorText('ffff00', "/scav hearth [on/off]")                          .. " - " .. L.help_hearth .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
+    print(colorText('ffff00', "/scav bank [on/off]")                            .. " - " .. L.help_bank .. currentlyOnOrOff(ScavengerUserData.AllowBank))
+    print(colorText('ffff00', "/scav mail")                                     .. " - " .. L.help_mail)
+    print(colorText('ffff00', "/scav trade")                                    .. " - " .. L.help_trade)
     print(' ')
 end
 
@@ -339,9 +365,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == 'MAIL_SHOW' then
 
-        CloseMail()
-        fail(L.no_mail)
-        flash(L.no_mail)
+        if not _allowMail then
+            CloseMail()
+            fail(L.no_mail)
+            flash(L.no_mail)
+        end
 
     elseif event == 'AUCTION_HOUSE_SHOW' then
 
@@ -351,9 +379,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == 'TRADE_SHOW' then
 
-        CancelTrade()
-        fail(L.no_trading)
-        flash(L.no_trading)
+        if not _allowTrade then
+            CancelTrade()
+            fail(L.no_trade)
+            flash(L.no_trade)
+        end
 
     elseif event == 'MERCHANT_SHOW' then
 
