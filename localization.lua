@@ -64,6 +64,7 @@ ns["enUS"] = {
     no_bank = "You cannot use the bank",
     bank_on = "Using the bank is now allowed",
     bank_off = "Using the bank is now forbidden",
+    init_desc = function(hearthOK, bankOK) return "No deaths, no trading, no mail, no auction house, no quest rewards, no merchant items (except a fishing pole and a mount), " .. (hearthOK and "hearthing OK" or "no hearthing") .. ", " .. (bankOK and "banking OK" or "no banking") end,
 }
 
 -- German (deDE)

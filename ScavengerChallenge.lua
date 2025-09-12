@@ -75,6 +75,7 @@ function ns.init()
 
     adapter:after(2.0, function()
         _initialized = true
+        success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
         success(L.init_tip(colorText('ffd000', '/scav')))
         ns.initItemsInBags()
         ns.checkEquippedItems(true)
