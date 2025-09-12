@@ -39,6 +39,7 @@ function ns.initDB(force)
     if ScavengerUserData.ForbiddenItems == nil then ScavengerUserData.ForbiddenItems = {} end
     if ScavengerUserData.AllowedItems == nil then ScavengerUserData.AllowedItems = {} end
     if ScavengerUserData.AllowHearth == nil then ScavengerUserData.AllowHearth = true end
+    if ScavengerUserData.AllowBank == nil then ScavengerUserData.AllowBank = true end
 end
 
 -- Utility UI text -------------------------------------------------------------
@@ -116,6 +117,32 @@ function ns.parseCommand(str)
         return
     end
 
+    local function setBank(tf)
+        if tf == nil then
+            ScavengerUserData.AllowBank = not ScavengerUserData.AllowBank
+        else
+            ScavengerUserData.AllowBank = tf
+        end
+        if ScavengerUserData.AllowBank then
+            success(L.bank_on)
+        else
+            success(L.bank_off)
+        end
+    end
+
+    p1, p2, match = str:find("^bank *(%a*)$")
+    if p1 then
+        match = match:lower()
+        if match == 'on' then
+            setBank(true)
+        elseif match == 'off' then
+            setBank(false)
+        else
+            setBank(nil)
+        end
+        return
+    end
+
     local function currentlyOnOrOff(tf)
         return " (" .. (tf and L.currently_on or L.currently_off) .. ")"
     end
@@ -127,6 +154,7 @@ function ns.parseCommand(str)
     print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}"))        print("   " .. L.help_allow_desc)
     print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}"))     print("   " .. L.help_disallow_desc)
     print(colorText('ffff00', "/scav hearth [on/off]"))                         print("   " .. L.help_hearth .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
+    print(colorText('ffff00', "/scav bank [on/off]"))                           print("   " .. L.help_bank .. currentlyOnOrOff(ScavengerUserData.AllowBank))
     print(' ')
 end
 
@@ -202,6 +230,7 @@ function ns.checkBags()                                                         
             local id = adapter:getContainerItemId(bag, slot)
             if id and id == HEARTHSTONE_ID then
                 fail(L.no_hearth)
+                flash(L.no_hearth)
             end
         end
     end                                                                                             --pdb(" ")
@@ -274,6 +303,9 @@ eventFrame:RegisterEvent("QUEST_COMPLETE")
 eventFrame:RegisterEvent("QUEST_FINISHED")
 eventFrame:RegisterEvent("CHAT_MSG_LOOT")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+eventFrame:RegisterEvent("BANKFRAME_OPENED")
+eventFrame:RegisterEvent("MAIL_SHOW")
+eventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
 
@@ -294,6 +326,26 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         adapter:after(.3, function()
             ns.checkEquippedItems()
         end)
+
+    elseif event == 'BANKFRAME_OPENED' then
+
+        if not ScavengerUserData.AllowBank then
+            CloseBankFrame()
+            fail(L.no_bank)
+            flash(L.no_bank)
+        end
+
+    elseif event == 'MAIL_SHOW' then
+
+        CloseMail()
+        fail(L.no_mail)
+        flash(L.no_mail)
+
+    elseif event == 'AUCTION_HOUSE_SHOW' then
+
+        CloseAuctionHouse()
+        fail(L.no_auction)
+        flash(L.no_auction)
 
     elseif event == 'MERCHANT_SHOW' then
 

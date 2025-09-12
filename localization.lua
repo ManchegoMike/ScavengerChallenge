@@ -49,6 +49,8 @@ ns["enUS"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") now allowed" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") now disallowed" end,
     cannot_equip_s = function(link) return "You cannot use " .. link end,
+    no_mail = "You cannot use mail",
+    no_auction = "You cannot use the auction house",
     id_name_link = "id/name/link",
     currently_on = "currently ON",
     currently_off = "currently OFF",
@@ -57,6 +59,11 @@ ns["enUS"] = {
     no_hearth = "You must destroy your hearthstone",
     hearth_on = "Hearthing is now allowed",
     hearth_off = "Hearthing is now forbidden",
+    help_bank  = "/scav bank [on/off]",
+    help_bank_desc = "Allow or disallow using a bank.",
+    no_bank = "You cannot use the bank",
+    bank_on = "Using the bank is now allowed",
+    bank_off = "Using the bank is now forbidden",
 }
 
 -- German (deDE)
