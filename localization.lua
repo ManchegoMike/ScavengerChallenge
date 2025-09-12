@@ -51,6 +51,7 @@ ns["enUS"] = {
     cannot_equip_s = function(link) return "You cannot use " .. link end,
     no_mail = "You cannot use mail",
     no_auction = "You cannot use the auction house",
+    no_trading = "You cannot trade",
     id_name_link = "id/name/link",
     currently_on = "currently ON",
     currently_off = "currently OFF",

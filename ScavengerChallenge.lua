@@ -307,6 +307,7 @@ eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:RegisterEvent("BANKFRAME_OPENED")
 eventFrame:RegisterEvent("MAIL_SHOW")
 eventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
+eventFrame:RegisterEvent("TRADE_SHOW")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
 
@@ -347,6 +348,12 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         CloseAuctionHouse()
         fail(L.no_auction)
         flash(L.no_auction)
+
+    elseif event == 'TRADE_SHOW' then
+
+        CancelTrade()
+        fail(L.no_trading)
+        flash(L.no_trading)
 
     elseif event == 'MERCHANT_SHOW' then
 
