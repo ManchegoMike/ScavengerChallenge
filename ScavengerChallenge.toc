@@ -1,7 +1,7 @@
 ## Interface: 11507
 ## Title: Scavenger Challenge|cFF00FF00 2.0.1|r
 ## Author: ManchegoMike
-## Notes: Hardcore, self-found, can't equip quest reward items, can't buy anything except a fishing pole and a level 40 mount
+## Notes: Hardcore, no auction house, no mail, no trading, no quest rewards, no vendor items (except a fishing pole and a mount), no hearthing, no bank
 ## Version: 2.0.1
 ## RequiredDeps:
 ## SavedVariablesPerCharacter: ScavengerUserData

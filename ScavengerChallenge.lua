@@ -1,5 +1,3 @@
--- FILE: main.lua
-
 local ADDONNAME, ns = ...
 if not ns then
     _G[ADDONNAME] = _G[ADDONNAME] or {}
@@ -21,11 +19,13 @@ local _allowTrade = false
 local _currentMerchantPage = nil    -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
 local _targetingQuestNpc = false    -- Toggled by quest events
 local _itemsInBags = {}             -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
+local _hearthTicker
 
 -- Constants -------------------------------------------------------------------
 
-local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.wav"
+local ERROR_SOUND_FILE = SOUNDKIT.ALARM_CLOCK_WARNING_3
 local HEARTHSTONE_ID = 6948
+local HEARTH_SPELL_ID = 8690
 
 -- Slash Commands --------------------------------------------------------------
 
@@ -40,8 +40,14 @@ function ns.initDB(force)
     if force or ScavengerUserData == nil then ScavengerUserData = {} end
     if ScavengerUserData.ForbiddenItems == nil then ScavengerUserData.ForbiddenItems = {} end
     if ScavengerUserData.AllowedItems == nil then ScavengerUserData.AllowedItems = {} end
-    if ScavengerUserData.AllowHearth == nil then ScavengerUserData.AllowHearth = true end
-    if ScavengerUserData.AllowBank == nil then ScavengerUserData.AllowBank = true end
+    if ScavengerUserData.AllowHearth == nil then ScavengerUserData.AllowHearth = false end
+    if ScavengerUserData.AllowBank == nil then ScavengerUserData.AllowBank = false end
+end
+
+-- Sound wrapper ---------------------------------------------------------------
+
+local function playError()
+    if _initialized then adapter:playSound(ERROR_SOUND_FILE) end
 end
 
 -- Utility UI text -------------------------------------------------------------
@@ -50,13 +56,7 @@ local function colorText(hex6, s)   return "|cFF" .. hex6 .. s .. "|r" end
 local function info(s)              print(colorText('c0c0c0', L.prefix) .. colorText('ffffff', s)) end
 local function fail(s)              print(colorText('ff0000', L.prefix) .. colorText('ffffff', s)) end
 local function success(s)           print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
-local function flash(s)             UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8) end
-
--- Sound wrapper ---------------------------------------------------------------
-
-local function playError()
-    if _initialized then adapter:playSound(ERROR_SOUND_FILE) end
-end
+local function flash(s,sound)       UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8); if sound ~= false then playError() end end
 
 -- Core init -------------------------------------------------------------------
 
@@ -81,6 +81,7 @@ function ns.init()
         success(L.init_tip(colorText('ffd000', '/scav')))
         ns.initItemsInBags()
         ns.checkEquippedItems(true)
+        ns.checkBags()
     end)
 end
 
@@ -148,23 +149,31 @@ function ns.parseCommand(str)
 
     p1, p2, match = str:find("^mail$")
     if p1 then
-        _allowMail = true
-        success(L.mail_activated)
-        adapter:after(60, function()
-            _allowMail = false
-            fail(L.mail_deactivated)
-        end)
+        if _allowMail then
+            fail(L.mail_already_activated)
+        else
+            _allowMail = true
+            success(L.mail_activated)
+            adapter:after(60, function()
+                _allowMail = false
+                success(L.mail_deactivated)
+            end)
+        end
         return
     end
 
     p1, p2, match = str:find("^trade$")
     if p1 then
-        _allowTrade = true
-        success(L.trade_activated)
-        adapter:after(60, function()
-            _allowTrade = false
-            fail(L.trade_deactivated)
-        end)
+        if _allowTrade then
+            fail(L.trade_already_activated)
+        else
+            _allowTrade = true
+            success(L.trade_activated)
+            adapter:after(60, function()
+                _allowTrade = false
+                success(L.trade_deactivated)
+            end)
+        end
         return
     end
 
@@ -173,15 +182,14 @@ function ns.parseCommand(str)
     end
 
     print(' ')
-    print(colorText('ff8000', L.title))
-    print(L.description)
+    success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
     print(' ')
-    print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}")         .. " - " .. L.help_allow_desc)
-    print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}")      .. " - " .. L.help_disallow_desc)
-    print(colorText('ffff00', "/scav hearth [on/off]")                          .. " - " .. L.help_hearth .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
-    print(colorText('ffff00', "/scav bank [on/off]")                            .. " - " .. L.help_bank .. currentlyOnOrOff(ScavengerUserData.AllowBank))
-    print(colorText('ffff00', "/scav mail")                                     .. " - " .. L.help_mail)
-    print(colorText('ffff00', "/scav trade")                                    .. " - " .. L.help_trade)
+    print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}")         .. " — " .. L.allow_help)
+    print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}")      .. " — " .. L.disallow_help)
+    print(colorText('ffff00', "/scav hearth [on/off]")                          .. " — " .. L.hearth_help .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
+    print(colorText('ffff00', "/scav bank [on/off]")                            .. " — " .. L.bank_help .. currentlyOnOrOff(ScavengerUserData.AllowBank))
+    print(colorText('ffff00', "/scav mail")                                     .. " — " .. L.mail_help)
+    print(colorText('ffff00', "/scav trade")                                    .. " — " .. L.trade_help)
     print(' ')
 end
 
@@ -228,7 +236,7 @@ end
 function ns.checkEquippedItems(showMessageIfAllOk)
     local msgs = ns.equippedItemsWarnings()
     if #msgs == 0 then
-        if showMessageIfAllOk then success(L.all_ok) end
+        if showMessageIfAllOk then success(L.all_equipped_ok) end
     else
         for _, msg in ipairs(msgs) do fail(msg) end
         if #msgs == 1 then flash(msgs[1]) else flash(L.unequip_n_quest_items(#msgs)) end
@@ -249,18 +257,18 @@ function ns.initItemsInBags()                                                   
     end                                                                                             --pdb(" ")
 end
 
-function ns.checkBags()                                                                             --pdb("checkBags")
+function ns.checkBags()
     _itemsInBags = {}
     for bag = 0, NUM_BAG_SLOTS do
         local slots = adapter:getContainerNumSlots(bag)
         for slot = 1, slots do
             local id = adapter:getContainerItemId(bag, slot)
             if id and id == HEARTHSTONE_ID then
-                fail(L.no_hearth)
-                flash(L.no_hearth)
+                fail(L.hearth_disallowed)
+                flash(L.hearth_disallowed)
             end
         end
-    end                                                                                             --pdb(" ")
+    end
 end
 
 -- Merchant filtering (Wrath/Classic UI only) ----------------------------------
@@ -334,6 +342,9 @@ eventFrame:RegisterEvent("BANKFRAME_OPENED")
 eventFrame:RegisterEvent("MAIL_SHOW")
 eventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
 eventFrame:RegisterEvent("TRADE_SHOW")
+eventFrame:RegisterEvent("UNIT_SPELLCAST_START")
+eventFrame:RegisterEvent("UNIT_SPELLCAST_STOP")
+eventFrame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
 
@@ -359,30 +370,30 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
         if not ScavengerUserData.AllowBank then
             CloseBankFrame()
-            fail(L.no_bank)
-            flash(L.no_bank)
+            fail(L.bank_disallowed)
+            flash(L.bank_disallowed)
         end
 
     elseif event == 'MAIL_SHOW' then
 
         if not _allowMail then
             CloseMail()
-            fail(L.no_mail)
-            flash(L.no_mail)
+            fail(L.mail_disallowed)
+            flash(L.mail_disallowed)
         end
 
     elseif event == 'AUCTION_HOUSE_SHOW' then
 
         CloseAuctionHouse()
-        fail(L.no_auction)
-        flash(L.no_auction)
+        fail(L.auction_disallowed)
+        flash(L.auction_disallowed)
 
     elseif event == 'TRADE_SHOW' then
 
         if not _allowTrade then
             CancelTrade()
-            fail(L.no_trade)
-            flash(L.no_trade)
+            fail(L.trade_disallowed)
+            flash(L.trade_disallowed)
         end
 
     elseif event == 'MERCHANT_SHOW' then
@@ -392,6 +403,37 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == 'MERCHANT_CLOSED' then
 
         _currentMerchantPage = nil
+
+    elseif event == 'UNIT_SPELLCAST_START' then
+
+        local unit, _, spellId = ...
+        if unit == "player" and spellId == HEARTH_SPELL_ID then
+
+            adapter:playSound(SOUNDKIT.RAID_WARNING)
+            flash(L.hearth_disallowed, false)
+            fail(L.hearth_disallowed)
+
+            if _hearthTicker then _hearthTicker:Cancel() end
+
+            local count = 0
+            _hearthTicker = C_Timer.NewTicker(1, function()
+                count = count + 1
+                adapter:playSound(SOUNDKIT.RAID_WARNING)
+                flash(L.hearth_disallowed, false)
+                if count >= 10 then
+                    _hearthTicker:Cancel()
+                    _hearthTicker = nil
+                end
+            end)
+
+        end
+
+    elseif event == 'UNIT_SPELLCAST_STOP' or event == 'UNIT_SPELLCAST_INTERRUPTED' then
+
+        if _hearthTicker then
+            _hearthTicker:Cancel()
+            _hearthTicker = nil
+        end
 
     elseif event == 'QUEST_ACCEPTED' or
            event == 'QUEST_COMPLETE' or
