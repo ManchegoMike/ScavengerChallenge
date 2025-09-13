@@ -7,5 +7,6 @@
 ## SavedVariablesPerCharacter: ScavengerUserData
 
 localization.lua
+CTimerAdapter.lua
 adapter.lua
 ScavengerChallenge.lua

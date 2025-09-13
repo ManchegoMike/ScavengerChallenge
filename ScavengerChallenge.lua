@@ -58,33 +58,6 @@ local function fail(s)              print(colorText('ff0000', L.prefix) .. color
 local function success(s)           print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
 local function flash(s,sound)       UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8); if sound ~= false then playError() end end
 
--- Core init -------------------------------------------------------------------
-
-function ns.init()
-    ns.initDB()
-
-    if ScavengerUserData.AllowedItems == nil or next(ScavengerUserData.AllowedItems) == nil then
-        ScavengerUserData.AllowedItems = {}
-        -- Allow fishing pole (6256) & mounts
-        -- Sadly we can't query the WoW API about mounts. They return class 15 subclass 0, which is "junk", so we have to check for them all individually.
-        for _,id in ipairs({6256,1132,2414,5655,5656,5665,5668,5864,5872,5873,8563,8588,8591,8592,8595,8629,8631,8632,13321,13322,13331,13332,13333,15277,15290,211498,211499,213170,216492,216570}) do
-            ScavengerUserData.AllowedItems[id] = 1
-        end
-    end
-    if ScavengerUserData.ForbiddenItems == nil or next(ScavengerUserData.ForbiddenItems) == nil then
-        ScavengerUserData.ForbiddenItems = {}
-    end
-
-    adapter:after(2.0, function()
-        _initialized = true
-        success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
-        success(L.init_tip(colorText('ffd000', '/scav')))
-        ns.initItemsInBags()
-        ns.checkEquippedItems(true)
-        ns.checkBags()
-    end)
-end
-
 -- Command parsing -------------------------------------------------------------
 
 function ns.parseCommand(str)
@@ -154,7 +127,7 @@ function ns.parseCommand(str)
         else
             _allowMail = true
             success(L.mail_activated)
-            adapter:after(60, function()
+            C_Timer.After(60, function()
                 _allowMail = false
                 success(L.mail_deactivated)
             end)
@@ -169,7 +142,7 @@ function ns.parseCommand(str)
         else
             _allowTrade = true
             success(L.trade_activated)
-            adapter:after(60, function()
+            C_Timer.After(60, function()
                 _allowTrade = false
                 success(L.trade_deactivated)
             end)
@@ -184,12 +157,12 @@ function ns.parseCommand(str)
     print(' ')
     success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
     print(' ')
-    print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}")         .. " — " .. L.allow_help)
-    print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}")      .. " — " .. L.disallow_help)
-    print(colorText('ffff00', "/scav hearth [on/off]")                          .. " — " .. L.hearth_help .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
-    print(colorText('ffff00', "/scav bank [on/off]")                            .. " — " .. L.bank_help .. currentlyOnOrOff(ScavengerUserData.AllowBank))
+    print(colorText('ffff00', "/scav hearth")                                   .. " — " .. L.hearth_help .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
+    print(colorText('ffff00', "/scav bank")                                     .. " — " .. L.bank_help .. currentlyOnOrOff(ScavengerUserData.AllowBank))
     print(colorText('ffff00', "/scav mail")                                     .. " — " .. L.mail_help)
     print(colorText('ffff00', "/scav trade")                                    .. " — " .. L.trade_help)
+    print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}")         .. " — " .. L.allow_help)
+    print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}")      .. " — " .. L.disallow_help)
     print(' ')
 end
 
@@ -288,7 +261,7 @@ local function hideOrShowMerchantItems(pageNumber)
             if btn then btn:Hide() end
         end
         -- Show buttons for allowed items
-        adapter:after(0.05, function()
+        C_Timer.After(0.05, function()
             for i = 1, MERCHANT_ITEMS_PER_PAGE do
                 local index = (pageNumber - 1) * MERCHANT_ITEMS_PER_PAGE + i
                 local link = GetMerchantItemLink(index)
@@ -350,11 +323,32 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     if event == 'PLAYER_LOGIN' then
 
-        ns.init()
+        ns.initDB()
+
+        if ScavengerUserData.AllowedItems == nil or next(ScavengerUserData.AllowedItems) == nil then
+            ScavengerUserData.AllowedItems = {}
+            -- Allow fishing pole (6256) & mounts
+            -- Sadly we can't query the WoW API about mounts. They return class 15 subclass 0, which is "junk", so we have to check for them all individually.
+            for _,id in ipairs({6256,1132,2414,5655,5656,5665,5668,5864,5872,5873,8563,8588,8591,8592,8595,8629,8631,8632,13321,13322,13331,13332,13333,15277,15290,211498,211499,213170,216492,216570}) do
+                ScavengerUserData.AllowedItems[id] = 1
+            end
+        end
+        if ScavengerUserData.ForbiddenItems == nil or next(ScavengerUserData.ForbiddenItems) == nil then
+            ScavengerUserData.ForbiddenItems = {}
+        end
+
+        C_Timer.After(2.0, function()
+            _initialized = true
+            success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
+            success(L.init_tip(colorText('ffd000', '/scav')))
+            ns.initItemsInBags()
+            ns.checkEquippedItems(true)
+            ns.checkBags()
+        end)
 
     elseif event == 'PLAYER_EQUIPMENT_CHANGED' then
 
-        adapter:after(0.3, ns.checkEquippedItems)
+        C_Timer.After(0.3, ns.checkEquippedItems)
 
     elseif event == 'PLAYER_TARGET_CHANGED' then -- This fires before MERCHANT_xxx or QUEST_xxx.
 
@@ -362,7 +356,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == 'PLAYER_REGEN_DISABLED' then -- Player is entering combat
 
-        adapter:after(.3, function()
+        C_Timer.After(0.3, function()
             ns.checkEquippedItems()
         end)
 
@@ -382,12 +376,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             flash(L.mail_disallowed)
         end
 
-    elseif event == 'AUCTION_HOUSE_SHOW' then
-
-        CloseAuctionHouse()
-        fail(L.auction_disallowed)
-        flash(L.auction_disallowed)
-
     elseif event == 'TRADE_SHOW' then
 
         if not _allowTrade then
@@ -395,6 +383,12 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             fail(L.trade_disallowed)
             flash(L.trade_disallowed)
         end
+
+    elseif event == 'AUCTION_HOUSE_SHOW' then
+
+        CloseAuctionHouse()
+        fail(L.auction_disallowed)
+        flash(L.auction_disallowed)
 
     elseif event == 'MERCHANT_SHOW' then
 
@@ -415,6 +409,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
             if _hearthTicker then _hearthTicker:Cancel() end
 
+            -- Ring a warning bell every second during the hearth cast.
             local count = 0
             _hearthTicker = C_Timer.NewTicker(1, function()
                 count = count + 1
@@ -428,7 +423,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
         end
 
-    elseif event == 'UNIT_SPELLCAST_STOP' or event == 'UNIT_SPELLCAST_INTERRUPTED' then
+    elseif event == 'UNIT_SPELLCAST_STOP' or
+           event == 'UNIT_SPELLCAST_INTERRUPTED' then
 
         if _hearthTicker then
             _hearthTicker:Cancel()
@@ -465,7 +461,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             if event == 'QUEST_FINISHED' then _targetingQuestNpc = true end
             local msg = ...
             local isQuestContext = _targetingQuestNpc
-            adapter:after(0.3, function()
+            C_Timer.After(0.3, function()
                 -- Look in bags for any item we haven't seen before in this session.
                 for bag = 0, NUM_BAG_SLOTS do
                     local slots = adapter:getContainerNumSlots(bag)

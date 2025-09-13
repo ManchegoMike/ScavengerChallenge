@@ -26,32 +26,6 @@ elseif type(UnitAura) == "function" then
     adapter.isWotLK = true
 end
 
--- Lightweight timer fallback (Wrath/Vanilla) ----------------------------------
-
-local waitTable = {}
-local waitFrame = CreateFrame("Frame")
-waitFrame:SetScript("OnUpdate", function(self, elapsed)
-    local i = 1
-    while i <= #waitTable do
-        local t = waitTable[i]
-        if t.time <= elapsed then
-            t.func()
-            table.remove(waitTable, i)
-        else
-            t.time = t.time - elapsed
-            i = i + 1
-        end
-    end
-end)
-
-function adapter:after(delay, func)
-    if C_Timer and type(C_Timer.After) == "function" then
-        C_Timer.After(delay, func)
-    else
-        table.insert(waitTable, { time = delay, func = func })
-    end
-end
-
 -- Debug table dump ------------------------------------------------------------
 
 function adapter:dumpTable(tbl)
