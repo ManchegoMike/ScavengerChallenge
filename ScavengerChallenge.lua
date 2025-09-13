@@ -25,7 +25,6 @@ local _hearthTicker
 
 local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.wav"
 local HEARTHSTONE_ID = 6948
-local HEARTH_SPELL_ID = 8690
 local TOO_LATE_FOR_CUSTOMIZATION = 8
 local ALLOWED_ITEMS = {
     6256,2901,7005,5956, -- fishing pole, mining pick, skinning knife, blacksmith hammer
@@ -390,42 +389,57 @@ function EV:MERCHANT_CLOSED()
     _currentMerchantPage = nil
 end
 
-local function isHearth(a1, a2, a3, a4)                                                             --pdb("isHearth") adapter:dumpTable({a1, a2, a3, a4})
+local FORBIDDEN_SPELLS = {
+    [8690]=1,   -- Hearthstone
+    [556]=1,    -- Astral Recall (shaman)
+}
+
+local function isForbiddenSpell(a1, a2, a3, a4)
     local spellId, spellName
-    if type(a1) == "string" and type(a4) == "number" then                                           --pdb("WotLK style")
+    if type(a1) == "string" and type(a4) == "number" then
+        -- WotLK style: (spellName, rank, lineId, spellId)
         spellId, spellName = a4, a1
-    elseif type(a2) == "number" then                                                                --pdb("Retail/Classic style")
-        spellId, spellName = a2, GetSpellInfo(spellId)
-    else                                                                                            --pdb("Epoch fallback")
+    elseif type(a2) == "number" then
+        -- Retail/Classic style: (castGUID, spellId)
+        spellId, spellName = a2, GetSpellInfo(a2)
+    else
+        -- Epoch fallback: (spellName only, spellId always 0)
         spellId, spellName = 0, a1
-    end                                                                                             --pdb("spellId, spellName =", spellId, spellName)
-
-    if spellId and spellId > 0 then
-        return spellId == HEARTH_SPELL_ID
     end
 
-    if spellName and spellName == GetSpellInfo(HEARTH_SPELL_ID) then
-        return true
+    -- Prefer spellId if valid
+    if spellId and spellId > 0 and FORBIDDEN_SPELLS[spellId] then
+        return spellName or GetSpellInfo(spellId)
     end
 
-    return false
+    -- Fallback to name check
+    if spellName then
+        for id in pairs(FORBIDDEN_SPELLS) do
+            if spellName == GetSpellInfo(id) then
+                return spellName
+            end
+        end
+    end
+
+    return nil
 end
 
 function EV:UNIT_SPELLCAST_START(unit, a1, a2, a3, a4)
     if ScavengerUserData.AllowHearth then return end
     if unit ~= "player" then return end
 
-    if isHearth(a1, a2, a3, a4) then
-        flash(L.hearth_disallowed)
-        fail(L.hearth_disallowed)
+    local spellName = isForbiddenSpell(a1, a2, a3, a4)
+    if spellName then
+        local msg = L.cannot_cast_s(spellName)
+        flash(msg)
+        fail(msg)
 
         if _hearthTicker then _hearthTicker:Cancel() end
 
-        -- Ring a warning bell every second during the hearth cast.
         local count = 0
         _hearthTicker = C_Timer.NewTicker(1, function()
             count = count + 1
-            flash(L.hearth_disallowed)
+            flash(msg)
             if count >= 10 then
                 _hearthTicker:Cancel()
                 _hearthTicker = nil
