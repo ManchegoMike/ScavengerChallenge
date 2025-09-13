@@ -27,6 +27,10 @@ local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.w
 local HEARTHSTONE_ID = 6948
 local HEARTH_SPELL_ID = 8690
 local TOO_LATE_FOR_CUSTOMIZATION = 8
+local ALLOWED_ITEMS = {
+    6256,2901,7005,5956, -- fishing pole, mining pick, skinning knife, blacksmith hammer
+    1132,2414,5655,5656,5665,5668,5864,5872,5873,8563,8588,8591,8592,8595,8629,8631,8632,13321,13322,13331,13332,13333,15277,15290,211498,211499,213170,216492,216570, -- mounts
+}
 
 -- Slash Commands --------------------------------------------------------------
 
@@ -43,6 +47,10 @@ function ns.initDB(force)
     if ScavengerUserData.AllowedItems == nil then ScavengerUserData.AllowedItems = {} end
     if ScavengerUserData.AllowHearth == nil then ScavengerUserData.AllowHearth = false end
     if ScavengerUserData.AllowBank == nil then ScavengerUserData.AllowBank = false end
+
+    for _,id in ipairs(ALLOWED_ITEMS) do
+        ScavengerUserData.AllowedItems[id] = 1
+    end
 end
 
 -- Sound wrapper ---------------------------------------------------------------
@@ -312,14 +320,6 @@ local EV = {}
 function EV:PLAYER_LOGIN()
     ns.initDB()
 
-    if ScavengerUserData.AllowedItems == nil or next(ScavengerUserData.AllowedItems) == nil then
-        ScavengerUserData.AllowedItems = {}
-        -- Allow fishing pole (6256) & mounts
-        -- Sadly we can't query the WoW API about mounts. They return class 15 subclass 0, which is "junk", so we have to check for them all individually.
-        for _,id in ipairs({6256,1132,2414,5655,5656,5665,5668,5864,5872,5873,8563,8588,8591,8592,8595,8629,8631,8632,13321,13322,13331,13332,13333,15277,15290,211498,211499,213170,216492,216570}) do
-            ScavengerUserData.AllowedItems[id] = 1
-        end
-    end
     if ScavengerUserData.ForbiddenItems == nil or next(ScavengerUserData.ForbiddenItems) == nil then
         ScavengerUserData.ForbiddenItems = {}
     end
@@ -412,6 +412,7 @@ local function isHearth(a1, a2, a3, a4)                                         
 end
 
 function EV:UNIT_SPELLCAST_START(unit, a1, a2, a3, a4)
+    if ScavengerUserData.AllowHearth then return end
     if unit ~= "player" then return end
 
     if isHearth(a1, a2, a3, a4) then
@@ -473,7 +474,7 @@ local function checkBagsForDifferences(...)
         if event == 'QUEST_FINISHED' then _targetingQuestNpc = true end
         local msg = ...
         local isQuestContext = _targetingQuestNpc
-        C_Timer.After(0.3, function()                                                               pdb("0.3 second delay, looking in bags")
+        C_Timer.After(0.3, function()                                                               --pdb("0.3 second delay, looking in bags")
             -- Look in bags for any item we haven't seen before in this session.
             for bag = 0, NUM_BAG_SLOTS do
                 local slots = adapter:getContainerNumSlots(bag)
@@ -533,7 +534,7 @@ end
 -- Handle events using the EV table.
 eventFrame:SetScript('OnEvent', function(self, event, ...)
     local func = EV[event]
-    if func then                                                                                    pdb(event)
+    if func then                                                                                    --pdb(event)
         func(self, ...)
     end
 end)
