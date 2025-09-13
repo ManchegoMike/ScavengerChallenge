@@ -26,6 +26,7 @@ local _hearthTicker
 local ERROR_SOUND_FILE = SOUNDKIT.ALARM_CLOCK_WARNING_3
 local HEARTHSTONE_ID = 6948
 local HEARTH_SPELL_ID = 8690
+local MAX_LEVEL_FOR_CUSTOMIZATION = 10
 
 -- Slash Commands --------------------------------------------------------------
 
@@ -50,13 +51,14 @@ local function playError()
     if _initialized then adapter:playSound(ERROR_SOUND_FILE) end
 end
 
--- Utility UI text -------------------------------------------------------------
+-- Utility funcs ---------------------------------------------------------------
 
-local function colorText(hex6, s)   return "|cFF" .. hex6 .. s .. "|r" end
-local function info(s)              print(colorText('c0c0c0', L.prefix) .. colorText('ffffff', s)) end
-local function fail(s)              print(colorText('ff0000', L.prefix) .. colorText('ffffff', s)) end
-local function success(s)           print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
-local function flash(s,sound)       UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8); if sound ~= false then playError() end end
+local function colorText(hex6, s)       return "|cFF" .. hex6 .. s .. "|r" end
+local function info(s)                  print(colorText('c0c0c0', L.prefix) .. colorText('ffffff', s)) end
+local function fail(s)                  print(colorText('ff0000', L.prefix) .. colorText('ffffff', s)) end
+local function success(s)               print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
+local function flash(s,sound)           UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8); if sound ~= false then playError() end end
+local function playerCanCustomize()     return UnitLevel("player") < MAX_LEVEL_FOR_CUSTOMIZATION end
 
 -- Command parsing -------------------------------------------------------------
 
@@ -68,16 +70,20 @@ function ns.parseCommand(str)
     if arg1 then ns.allowOrDisallowItem(arg1, false, true); return end
 
     local function setHearth(tf)
-        if tf == nil then
-            ScavengerUserData.AllowHearth = not ScavengerUserData.AllowHearth
+        if playerCanCustomize() then
+            if tf == nil then
+                ScavengerUserData.AllowHearth = not ScavengerUserData.AllowHearth
+            else
+                ScavengerUserData.AllowHearth = tf
+            end
+            if ScavengerUserData.AllowHearth then
+                success(L.hearth_on)
+            else
+                success(L.hearth_off)
+                ns.checkBags()
+            end
         else
-            ScavengerUserData.AllowHearth = tf
-        end
-        if ScavengerUserData.AllowHearth then
-            success(L.hearth_on)
-        else
-            success(L.hearth_off)
-            ns.checkBags()
+            fail(L.level_too_high)
         end
     end
 
@@ -95,15 +101,19 @@ function ns.parseCommand(str)
     end
 
     local function setBank(tf)
-        if tf == nil then
-            ScavengerUserData.AllowBank = not ScavengerUserData.AllowBank
+        if playerCanCustomize() then
+            if tf == nil then
+                ScavengerUserData.AllowBank = not ScavengerUserData.AllowBank
+            else
+                ScavengerUserData.AllowBank = tf
+            end
+            if ScavengerUserData.AllowBank then
+                success(L.bank_on)
+            else
+                success(L.bank_off)
+            end
         else
-            ScavengerUserData.AllowBank = tf
-        end
-        if ScavengerUserData.AllowBank then
-            success(L.bank_on)
-        else
-            success(L.bank_off)
+            fail(L.level_too_high)
         end
     end
 
@@ -150,15 +160,13 @@ function ns.parseCommand(str)
         return
     end
 
-    local function currentlyOnOrOff(tf)
-        return " (" .. (tf and L.currently_on or L.currently_off) .. ")"
-    end
-
     print(' ')
     success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
     print(' ')
-    print(colorText('ffff00', "/scav hearth")                                   .. " — " .. L.hearth_help .. currentlyOnOrOff(ScavengerUserData.AllowHearth))
-    print(colorText('ffff00', "/scav bank")                                     .. " — " .. L.bank_help .. currentlyOnOrOff(ScavengerUserData.AllowBank))
+    if playerCanCustomize() then
+        print(colorText('ffff00', "/scav hearth")                               .. " — " .. L.hearth_help(MAX_LEVEL_FOR_CUSTOMIZATION))
+        print(colorText('ffff00', "/scav bank")                                 .. " — " .. L.bank_help(MAX_LEVEL_FOR_CUSTOMIZATION))
+    end
     print(colorText('ffff00', "/scav mail")                                     .. " — " .. L.mail_help)
     print(colorText('ffff00', "/scav trade")                                    .. " — " .. L.trade_help)
     print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}")         .. " — " .. L.allow_help)
