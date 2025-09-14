@@ -7,7 +7,7 @@ end
 local L = ns.L
 local adapter = ns.adapter
 
-local dbg = true -- This should only be true if debugging.
+local dbg = false -- This should only be true if debugging.
 local function printnothing() end
 local pdb = dbg and print or printnothing
 
@@ -25,10 +25,10 @@ local _hearthTicker
 
 local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.wav"
 local HEARTHSTONE_ID = 6948
-local TOO_LATE_FOR_CUSTOMIZATION = 8
-local ALLOWED_ITEMS = {
-    6256,2901,7005,5956, -- fishing pole, mining pick, skinning knife, blacksmith hammer
-    1132,2414,5655,5656,5665,5668,5864,5872,5873,8563,8588,8591,8592,8595,8629,8631,8632,13321,13322,13331,13332,13333,15277,15290,211498,211499,213170,216492,216570, -- mounts
+local TOO_LATE_FOR_CUSTOMIZATION = 6
+local MERCHANT_EXCEPTIONS = {
+    [6256]=1, [2901]=1, [7005]=1, [5956]=1,  -- fishing pole / mining pick / skinning knife / blacksmith hammer
+    [1132]=1, [2414]=1, [5655]=1, [5656]=1, [5665]=1, [5668]=1, [5864]=1, [5872]=1, [5873]=1, [8563]=1, [8588]=1, [8591]=1, [8592]=1, [8595]=1, [8629]=1, [8631]=1, [8632]=1, [13321]=1, [13322]=1, [13331]=1, [13332]=1, [13333]=1, [15277]=1, [15290]=1, [211498]=1, [211499]=1, [213170]=1, [216492]=1, [216570]=1,  -- mounts
 }
 
 -- Slash Commands --------------------------------------------------------------
@@ -46,9 +46,12 @@ function ns.initDB(force)
     if ScavengerUserData.AllowedItems == nil then ScavengerUserData.AllowedItems = {} end
     if ScavengerUserData.AllowHearth == nil then ScavengerUserData.AllowHearth = false end
     if ScavengerUserData.AllowBank == nil then ScavengerUserData.AllowBank = false end
+    if ScavengerUserData.NoexMode == nil then ScavengerUserData.NoexMode = false end
 
-    for _,id in ipairs(ALLOWED_ITEMS) do
-        ScavengerUserData.AllowedItems[id] = 1
+    local value = nil
+    if not ScavengerUserData.NoexMode then value = 1 end
+    for id,_ in pairs(MERCHANT_EXCEPTIONS) do
+        ScavengerUserData.AllowedItems[id] = value
     end
 end
 
@@ -83,6 +86,7 @@ function ns.parseCommand(str)
             else
                 ScavengerUserData.AllowHearth = tf
             end
+
             if ScavengerUserData.AllowHearth then
                 success(L.hearth_on)
             else
@@ -114,6 +118,7 @@ function ns.parseCommand(str)
             else
                 ScavengerUserData.AllowBank = tf
             end
+
             if ScavengerUserData.AllowBank then
                 success(L.bank_on)
             else
@@ -133,6 +138,41 @@ function ns.parseCommand(str)
             setBank(false)
         else
             setBank(nil)
+        end
+        return
+    end
+
+    local function setNoex(tf)
+        if playerCanCustomize() then
+            if tf == nil then
+                ScavengerUserData.NoexMode = not ScavengerUserData.NoexMode
+            else
+                ScavengerUserData.NoexMode = tf
+            end
+
+            if ScavengerUserData.NoexMode then
+                success(L.noex_on)
+                ns.checkEquippedItems()
+                ns.checkBags()
+            else
+                success(L.noex_off)
+            end
+
+            ns.initDB()
+        else
+            fail(L.level_too_high)
+        end
+    end
+
+    p1, p2, match = str:find("^noex *(%a*)$")
+    if p1 then
+        match = match:lower()
+        if match == 'on' then
+            setNoex(true)
+        elseif match == 'off' then
+            setNoex(false)
+        else
+            setNoex(nil)
         end
         return
     end
@@ -168,11 +208,12 @@ function ns.parseCommand(str)
     end
 
     print(' ')
-    success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
+    success(L.init_desc(ScavengerUserData.NoexMode, ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
     print(' ')
     if playerCanCustomize() then
-        print(colorText('ffff00', "/scav hearth")                               .. " — " .. L.hearth_help(TOO_LATE_FOR_CUSTOMIZATION))
-        print(colorText('ffff00', "/scav bank")                                 .. " — " .. L.bank_help(TOO_LATE_FOR_CUSTOMIZATION))
+        print(colorText('ffff00', "/scav noex")                                 .. " — " .. L.noex_help_i(TOO_LATE_FOR_CUSTOMIZATION))
+        print(colorText('ffff00', "/scav hearth")                               .. " — " .. L.hearth_help_i(TOO_LATE_FOR_CUSTOMIZATION))
+        print(colorText('ffff00', "/scav bank")                                 .. " — " .. L.bank_help_i(TOO_LATE_FOR_CUSTOMIZATION))
     end
     print(colorText('ffff00', "/scav mail")                                     .. " — " .. L.mail_help)
     print(colorText('ffff00', "/scav trade")                                    .. " — " .. L.trade_help)
@@ -213,9 +254,13 @@ function ns.equippedItemsWarnings()
     local msgs = {}
     for slot = 1, 18 do
         local itemId = GetInventoryItemID('player', slot)
-        if itemId and ScavengerUserData.ForbiddenItems[itemId] then
+        if itemId then
             local name, link = GetItemInfo(itemId)
-            msgs[#msgs+1] = L.unequip_quest_item_s(link or ("item "..itemId))
+            if ScavengerUserData.ForbiddenItems[itemId] then
+                msgs[#msgs+1] = L.unequip_quest_item_s(link or ("item "..itemId))
+            elseif MERCHANT_EXCEPTIONS[itemId] and ScavengerUserData.NoexMode then
+                msgs[#msgs+1] = L.discard_item_s(link or ("item "..itemId))
+            end
         end
     end
     return msgs
@@ -246,14 +291,18 @@ function ns.initItemsInBags()                                                   
 end
 
 function ns.checkBags()
-    if not ScavengerUserData.AllowHearth then
-        for bag = 0, NUM_BAG_SLOTS do
-            local slots = adapter:getContainerNumSlots(bag)
-            for slot = 1, slots do
-                local id = adapter:getContainerItemId(bag, slot)
-                if id and id == HEARTHSTONE_ID then
+    for bag = 0, NUM_BAG_SLOTS do
+        local slots = adapter:getContainerNumSlots(bag)
+        for slot = 1, slots do
+            local id = adapter:getContainerItemId(bag, slot)
+            if id then
+                if id == HEARTHSTONE_ID and not ScavengerUserData.AllowHearth then
                     fail(L.hearth_disallowed)
                     flash(L.hearth_disallowed)
+                elseif MERCHANT_EXCEPTIONS[id] and ScavengerUserData.NoexMode then
+                    local link = adapter:getContainerItemLink(bag, slot)
+                    fail(L.discard_item_s(link))
+                    flash(L.discard_item_s(link))
                 end
             end
         end
@@ -325,7 +374,7 @@ function EV:PLAYER_LOGIN()
 
     C_Timer.After(2.0, function()
         _initialized = true
-        success(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
+        success(L.init_desc(ScavengerUserData.NoexMode, ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
         success(L.init_tip(colorText('ffd000', '/scav')))
         ns.initItemsInBags()
         ns.checkEquippedItems(true)

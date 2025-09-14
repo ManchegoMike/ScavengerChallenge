@@ -35,19 +35,23 @@ ns["enUS"] = {
     auction_disallowed = "You cannot use the auction house",
     bad_item_link_s = function(s) return "Unable to parse item link: " .. s end,
     bank_disallowed = "You cannot use the bank",
-    bank_help = function(level) return "Allow or disallow using the bank (decide before level " .. level .. ")" end,
+    bank_help_i = function(level) return "Allow or disallow using the bank (decide before level " .. level .. ")" end,
     bank_off = "Using the bank is now forbidden",
     bank_on = "Using the bank is now allowed",
     cannot_cast_s = function(name) return "You cannot cast " .. name end,
     cannot_equip_s = function(link) return "You cannot use " .. link end,
     disallow_help = "Disallow an item you specify",
+    discard_item_s = function(s) return "You must discard " .. s end,
     hearth_disallowed = "You cannot hearth - please destroy your hearthstone",
-    hearth_help = function(level) return "Allow or disallow using a hearthstone (decide before level " .. level .. ")" end,
+    hearth_help_i = function(level) return "Allow or disallow using a hearthstone (decide before level " .. level .. ")" end,
     hearth_off = "Hearthing is now forbidden",
     hearth_on = "Hearthing is now allowed",
     id_name_link = "id/name/link",
-    init_base = "No dying, no trading, no mail, no auction house, no quest rewards, no buying from vendors (with a few exceptions)",
-    init_desc = function(hearthOK, bankOK) return L.init_base .. ", " .. (hearthOK and "hearthing OK" or "no hearthing") .. ", " .. (bankOK and "banking OK" or "no banking") end,
+    init_base = "No dying, no trading, no mail, no auction house, no quest rewards, no buying from vendors",
+    init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
+        " (" .. (noex and "no exceptions" or "with a few exceptions") .. ")" .. ", " ..
+        (hearthOK and "hearthing OK" or "no hearthing") .. ", " ..
+        (bankOK and "banking OK" or "no banking") end,
     init_tip = function(cmd) return "Initialized: type " .. cmd .. " for more info" end,
     item_not_found_s = function(s) return "Item not found: " .. s end,
     level_too_high = "Your level is too high to change that",
@@ -56,6 +60,9 @@ ns["enUS"] = {
     mail_deactivated = "One minute has elapsed: mail is now deactivated",
     mail_disallowed = "You cannot use mail",
     mail_help = "Allow using mail for one minute (for quests only)",
+    noex_help_i = function(level) return "No vendor will sell to you, no exceptions (decide before level " .. level .. ")" end,
+    noex_off = "You can now buy a few vendor items, including a mount",
+    noex_on = "No vendor will sell to you now, no exceptions",
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") now allowed" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") now disallowed" end,
     prefix = "SCAVENGER: ", -- One space at the end
@@ -66,7 +73,6 @@ ns["enUS"] = {
     trade_help = "Allow trading for one minute (for emergencies only)",
     unequip_n_quest_items = function(n) return "Unequip " .. n .. " quest items" end,
     unequip_quest_item_s = function(link) return "Unequip quest item " .. link end,
-
 }
 
 -- German (deDE)
