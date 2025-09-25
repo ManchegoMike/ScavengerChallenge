@@ -24,11 +24,16 @@ local _hearthTicker
 -- Constants -------------------------------------------------------------------
 
 local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.wav"
-local HEARTHSTONE_ID = 6948
+local HEARTHSTONE_ITEM_ID = 6948
+local HEARTHSTONE_SPELL_ID = 8690
+local HEARTHSTONE_SPELL_NAME = GetSpellInfo(HEARTHSTONE_SPELL_ID)
 local TOO_LATE_FOR_CUSTOMIZATION = 6
 local MERCHANT_EXCEPTIONS = {
     [6256]=1, [2901]=1, [7005]=1, [5956]=1,  -- fishing pole / mining pick / skinning knife / blacksmith hammer
     [1132]=1, [2414]=1, [5655]=1, [5656]=1, [5665]=1, [5668]=1, [5864]=1, [5872]=1, [5873]=1, [8563]=1, [8588]=1, [8591]=1, [8592]=1, [8595]=1, [8629]=1, [8631]=1, [8632]=1, [13321]=1, [13322]=1, [13331]=1, [13332]=1, [13333]=1, [15277]=1, [15290]=1, [211498]=1, [211499]=1, [213170]=1, [216492]=1, [216570]=1,  -- mounts
+}
+local ALLOWED_ITEMS = {
+    [5175]=1, [5176]=1,  [5177]=1,  [5178]=1, -- earth, fire, water, air totems
 }
 
 -- Slash Commands --------------------------------------------------------------
@@ -296,7 +301,7 @@ function ns.checkBags()
         for slot = 1, slots do
             local id = adapter:getContainerItemId(bag, slot)
             if id then
-                if id == HEARTHSTONE_ID and not ScavengerUserData.AllowHearth then
+                if id == HEARTHSTONE_ITEM_ID and not ScavengerUserData.AllowHearth then
                     fail(L.hearth_disallowed)
                     flash(L.hearth_disallowed)
                 elseif MERCHANT_EXCEPTIONS[id] and ScavengerUserData.NoexMode then
@@ -438,12 +443,21 @@ function EV:MERCHANT_CLOSED()
     _currentMerchantPage = nil
 end
 
+-- These are only checked if ScavengerUserData.AllowHearth is false.
 local FORBIDDEN_SPELLS = {
     [8690]=1,   -- Hearthstone
     [556]=1,    -- Astral Recall (shaman)
 }
 
-local function isForbiddenSpell(a1, a2, a3, a4)
+-- These are only checked if ScavengerUserData.AllowHearth is false.
+local SPELLS_THAT_REQUIRE_RESTED_XP = {
+    [18960]=1,  -- Teleport: Moonglade
+}
+
+-- This function is only called if ScavengerUserData.AllowHearth is false.
+-- Returns nil if spell is allowed; returns error string if not allowed.
+-- The arguments (a1-a4) vary with different versions of WoW.
+local function forbiddenSpellErrorMessage(a1, a2, a3, a4)
     local spellId, spellName
     if type(a1) == "string" and type(a4) == "number" then
         -- WotLK style: (spellName, rank, lineId, spellId)
@@ -456,16 +470,34 @@ local function isForbiddenSpell(a1, a2, a3, a4)
         spellId, spellName = 0, a1
     end
 
+    -- Check for forbidden spells.
     -- Prefer spellId if valid
     if spellId and spellId > 0 and FORBIDDEN_SPELLS[spellId] then
-        return spellName or GetSpellInfo(spellId)
+        return L.cannot_cast_s(spellName or GetSpellInfo(spellId))
     end
 
     -- Fallback to name check
     if spellName then
         for id in pairs(FORBIDDEN_SPELLS) do
             if spellName == GetSpellInfo(id) then
-                return spellName
+                return L.cannot_cast_s(spellName)
+            end
+        end
+    end
+
+    -- Check for spells that can only be cast in an inn or a city.
+    if not IsResting() then
+        -- Prefer spellId if valid
+        if spellId and spellId > 0 and SPELLS_THAT_REQUIRE_RESTED_XP[spellId] then
+            return L.spell_requires_rested_xp_s(spellName or GetSpellInfo(spellId))
+        end
+
+        -- Fallback to name check
+        if spellName then
+            for id in pairs(SPELLS_THAT_REQUIRE_RESTED_XP) do
+                if spellName == GetSpellInfo(id) then
+                    return L.spell_requires_rested_xp_s(spellName)
+                end
             end
         end
     end
@@ -477,16 +509,15 @@ function EV:UNIT_SPELLCAST_START(unit, a1, a2, a3, a4)
     if ScavengerUserData.AllowHearth then return end
     if unit ~= "player" then return end
 
-    local spellName = isForbiddenSpell(a1, a2, a3, a4)
-    if spellName then
-        local msg = L.cannot_cast_s(spellName)
+    local msg = forbiddenSpellErrorMessage(a1, a2, a3, a4)                                          --pdb(msg)
+    if msg then
         flash(msg)
         fail(msg)
 
         if _hearthTicker then _hearthTicker:Cancel() end
 
         local count = 0
-        _hearthTicker = C_Timer.NewTicker(1, function()
+        _hearthTicker = C_Timer.NewTicker(0.75, function()
             count = count + 1
             flash(msg)
             if count >= 10 then
@@ -546,19 +577,20 @@ local function checkBagsForDifferences(...)
                     if id and not _itemsInBags[id] then
                         -- This is an item we haven't seen before in the bags.
                         _itemsInBags[id] = 1                                                        --pdb("isQuestContext")
-                        if isQuestContext then
+                        if not ALLOWED_ITEMS[id] and isQuestContext then
                             -- Here we check if the item is a quest item,
                             -- which means it's something required for the
                             -- quest, and is not a quest reward. If it isn't
                             -- a quest item, it's a (forbidden) reward.
-                            local link = adapter:getContainerItemLink(bag, slot)                    --pdb("new item=", link, id)
-                            local isQuestItem = adapter:getContainerItemQuestInfo(bag, slot)        --pdb("isQuestItem=", isQuestItem)
-                            if not isQuestItem then
-                                ScavengerUserData.ForbiddenItems[id] = 1
-                                _targetingQuestNpc = false
-                                fail(L.cannot_equip_s(link))
-                                flash(L.cannot_equip_s(link))
-                                playError()
+                            local link = adapter:getContainerItemLink(bag, slot)                    --pdb("new item <<", link, ">>", id)
+                            if link and link ~= "" then
+                                local isQuestItem = adapter:getContainerItemQuestInfo(bag, slot)    --pdb("isQuestItem=", isQuestItem)
+                                if not isQuestItem then
+                                    ScavengerUserData.ForbiddenItems[id] = 1
+                                    _targetingQuestNpc = false
+                                    fail(L.cannot_equip_s(link))
+                                    flash(L.cannot_equip_s(link), false)
+                                end
                             end
                         end
                     end

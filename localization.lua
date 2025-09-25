@@ -49,9 +49,10 @@ ns["enUS"] = {
     id_name_link = "id/name/link",
     init_base = "No dying, no trading, no mail, no auction house, no quest rewards, no buying from vendors",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        " (" .. (noex and "no exceptions" or "with a few exceptions") .. ")" .. ", " ..
-        (hearthOK and "hearthing OK" or "no hearthing") .. ", " ..
-        (bankOK and "banking OK" or "no banking") end,
+        (noex and " (no exceptions)" or " (with a few exceptions)") ..
+        (bankOK and ", banking OK" or ", no banking") ..
+        (hearthOK and ", hearthing OK" or ", no hearthing") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "Initialized: type " .. cmd .. " for more info" end,
     item_not_found_s = function(s) return "Item not found: " .. s end,
     level_too_high = "Your level is too high to change that",
@@ -66,6 +67,7 @@ ns["enUS"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") now allowed" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") now disallowed" end,
     prefix = "SCAVENGER: ", -- One space at the end
+    spell_requires_rested_xp_s = function(s) return s .. " can only be cast in an inn or a city" end,
     trade_activated = "You can now trade for one minute",
     trade_already_activated = "Trading is already activated for one minute",
     trade_deactivated = "One minute has elapsed: trading is now deactivated",
@@ -96,9 +98,10 @@ ns["deDE"] = {
     id_name_link = "id/Name/Link",
     init_base = "Kein Sterben, kein Handeln, keine Post, kein Auktionshaus, keine Questbelohnungen, kein Kaufen bei Händlern",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        " (" .. (noex and "keine Ausnahmen" or "mit wenigen Ausnahmen") .. ")" .. ", " ..
-        (hearthOK and "Ruhestein erlaubt" or "kein Ruhestein") .. ", " ..
-        (bankOK and "Bank erlaubt" or "keine Bank") end,
+        (noex and " (keine Ausnahmen)" or " (mit wenigen Ausnahmen)") ..
+        (bankOK and ", Bank erlaubt" or ", keine Bank") ..
+        (hearthOK and ", Ruhestein erlaubt" or ", kein Ruhestein") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "Initialisiert: Tippe " .. cmd .. " für mehr Infos" end,
     item_not_found_s = function(s) return "Gegenstand nicht gefunden: " .. s end,
     level_too_high = "Deine Stufe ist zu hoch, um das zu ändern",
@@ -113,6 +116,7 @@ ns["deDE"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") jetzt erlaubt" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") jetzt verboten" end,
     prefix = "SCAVENGER: ",
+    spell_requires_rested_xp_s = function(s) return s .. " kann nur in einem Gasthaus oder einer Stadt gewirkt werden" end,
     trade_activated = "Du kannst jetzt eine Minute lang handeln",
     trade_already_activated = "Handeln ist bereits für eine Minute aktiviert",
     trade_deactivated = "Eine Minute ist vorbei: Handeln ist jetzt deaktiviert",
@@ -143,9 +147,10 @@ ns["esES"] = {
     id_name_link = "id/nombre/enlace",
     init_base = "No morir, no comerciar, sin correo, sin casa de subastas, sin recompensas de misiones, no comprar en vendedores",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        " (" .. (noex and "sin excepciones" or "con algunas excepciones") .. ")" .. ", " ..
-        (hearthOK and "piedra de hogar permitida" or "sin piedra de hogar") .. ", " ..
-        (bankOK and "banco permitido" or "sin banco") end,
+        (noex and " (sin excepciones)" or " (con algunas excepciones)") ..
+        (bankOK and ", banco permitido" or ", sin banco") ..
+        (hearthOK and ", piedra de hogar permitida" or ", sin piedra de hogar") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "Inicializado: escribe " .. cmd .. " para más información" end,
     item_not_found_s = function(s) return "Objeto no encontrado: " .. s end,
     level_too_high = "Tu nivel es demasiado alto para cambiar eso",
@@ -160,6 +165,7 @@ ns["esES"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") ahora permitido" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") ahora prohibido" end,
     prefix = "SCAVENGER: ",
+    spell_requires_rested_xp_s = function(s) return s .. " solo se puede lanzar en una posada o una ciudad" end,
     trade_activated = "Ahora puedes comerciar durante un minuto",
     trade_already_activated = "El comercio ya está activado durante un minuto",
     trade_deactivated = "Un minuto ha pasado: el comercio ahora está desactivado",
@@ -190,9 +196,10 @@ ns["frFR"] = {
     id_name_link = "id/nom/lien",
     init_base = "Pas de mort, pas d’échanges, pas de courrier, pas d’hôtel des ventes, pas de récompenses de quêtes, pas d’achats chez les marchands",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        " (" .. (noex and "aucune exception" or "avec quelques exceptions") .. ")" .. ", " ..
-        (hearthOK and "pierre de foyer autorisée" or "pas de pierre de foyer") .. ", " ..
-        (bankOK and "banque autorisée" or "pas de banque") end,
+        (noex and " (aucune exception)" or " (avec quelques exceptions)") ..
+        (bankOK and ", banque autorisée" or ", pas de banque") ..
+        (hearthOK and ", pierre de foyer autorisée" or ", pas de pierre de foyer") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "Initialisé : tapez " .. cmd .. " pour plus d’informations" end,
     item_not_found_s = function(s) return "Objet introuvable : " .. s end,
     level_too_high = "Votre niveau est trop élevé pour changer cela",
@@ -207,6 +214,7 @@ ns["frFR"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") maintenant autorisé" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") maintenant interdit" end,
     prefix = "SCAVENGER : ",
+    spell_requires_rested_xp_s = function(s) return s .. " ne peut être lancé que dans une auberge ou une ville" end,
     trade_activated = "Vous pouvez maintenant échanger pendant une minute",
     trade_already_activated = "L’échange est déjà activé pour une minute",
     trade_deactivated = "Une minute s’est écoulée : l’échange est maintenant désactivé",
@@ -237,9 +245,10 @@ ns["itIT"] = {
     id_name_link = "id/nome/link",
     init_base = "Niente morti, niente scambi, niente posta, niente casa d’aste, niente ricompense delle missioni, niente acquisti dai mercanti",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        " (" .. (noex and "nessuna eccezione" or "con poche eccezioni") .. ")" .. ", " ..
-        (hearthOK and "pietra del ritorno consentita" or "nessuna pietra del ritorno") .. ", " ..
-        (bankOK and "banca consentita" or "nessuna banca") end,
+        (noex and " (nessuna eccezione)" or " (con alcune eccezioni)") ..
+        (bankOK and ", banca consentita" or ", nessuna banca") ..
+        (hearthOK and ", pietra del ritorno consentita" or ", nessuna pietra del ritorno") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "Inizializzato: digita " .. cmd .. " per maggiori informazioni" end,
     item_not_found_s = function(s) return "Oggetto non trovato: " .. s end,
     level_too_high = "Il tuo livello è troppo alto per modificare questo",
@@ -254,6 +263,7 @@ ns["itIT"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") ora consentito" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") ora proibito" end,
     prefix = "SCAVENGER: ",
+    spell_requires_rested_xp_s = function(s) return s .. " può essere lanciato solo in una locanda o in una città" end,
     trade_activated = "Ora puoi commerciare per un minuto",
     trade_already_activated = "Il commercio è già attivato per un minuto",
     trade_deactivated = "Un minuto è passato: il commercio è ora disattivato",
@@ -284,10 +294,10 @@ ns["ruRU"] = {
     id_name_link = "id/имя/ссылка",
     init_base = "Без смертей, без торговли, без почты, без аукциона, без наград за задания, без покупок у торговцев",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        " (" .. (noex and "без исключений" or "с некоторыми исключениями") .. ")" .. ", " ..
-        (hearthOK and "камень возвращения разрешен" or "без камня возвращения") .. ", " ..
-        (bankOK and "банк разрешен" or "без банка") end,
--- Russian (ruRU) continued
+        (noex and " (без исключений)" or " (с некоторыми исключениями)") ..
+        (bankOK and ", банк разрешен" or ", без банка") ..
+        (hearthOK and ", камень возвращения разрешен" or ", без камня возвращения") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "Инициализировано: введите " .. cmd .. " для дополнительной информации" end,
     item_not_found_s = function(s) return "Предмет не найден: " .. s end,
     level_too_high = "Ваш уровень слишком высок, чтобы это изменить",
@@ -302,6 +312,7 @@ ns["ruRU"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") теперь разрешен" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") теперь запрещен" end,
     prefix = "SCAVENGER: ",
+    spell_requires_rested_xp_s = function(s) return s .. " можно использовать только в таверне или городе" end,
     trade_activated = "Теперь вы можете торговать в течение одной минуты",
     trade_already_activated = "Торговля уже активирована на одну минуту",
     trade_deactivated = "Прошла одна минута: торговля теперь деактивирована",
@@ -332,9 +343,10 @@ ns["zhTW"] = {
     id_name_link = "id/名稱/連結",
     init_base = "禁止死亡，禁止交易，禁止郵件，禁止拍賣場，禁止任務獎勵，禁止向商人購買",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        "（" .. (noex and "沒有例外" or "有少數例外") .. "）" .. "，" ..
-        (hearthOK and "允許爐石" or "禁止爐石") .. "，" ..
-        (bankOK and "允許銀行" or "禁止銀行") end,
+        (noex and "（沒有例外）" or "（有少數例外）") ..
+        (bankOK and "，允許銀行" or "，禁止銀行") ..
+        (hearthOK and "，允許爐石" or "，禁止爐石") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and ("，" .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "已初始化：輸入 " .. cmd .. " 以取得更多資訊" end,
     item_not_found_s = function(s) return "找不到物品: " .. s end,
     level_too_high = "你的等級太高，無法更改此項",
@@ -349,6 +361,7 @@ ns["zhTW"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") 現在允許" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") 現在禁止" end,
     prefix = "SCAVENGER: ",
+    spell_requires_rested_xp_s = function(s) return s .. "只能在旅店或城市中施放" end,
     trade_activated = "你現在可以交易一分鐘",
     trade_already_activated = "交易已啟用一分鐘",
     trade_deactivated = "一分鐘已過：交易現在停用",
@@ -379,9 +392,10 @@ ns["koKR"] = {
     id_name_link = "id/이름/링크",
     init_base = "죽음 금지, 거래 금지, 우편 금지, 경매장 금지, 퀘스트 보상 금지, 상인에게서 구매 금지",
     init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        " (" .. (noex and "예외 없음" or "일부 예외 있음") .. ")" .. ", " ..
-        (hearthOK and "귀환석 허용" or "귀환석 금지") .. ", " ..
-        (bankOK and "은행 허용" or "은행 금지") end,
+        (noex and " (예외 없음)" or " (일부 예외 있음)") ..
+        (bankOK and ", 은행 허용" or ", 은행 금지") ..
+        (hearthOK and ", 귀환석 허용" or ", 귀환석 금지") ..
+        ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
     init_tip = function(cmd) return "초기화됨: " .. cmd .. " 입력 시 더 많은 정보 제공" end,
     item_not_found_s = function(s) return "아이템을 찾을 수 없습니다: " .. s end,
     level_too_high = "해당 변경을 하기에는 레벨이 너무 높습니다",
@@ -396,6 +410,7 @@ ns["koKR"] = {
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") 이제 허용됨" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") 이제 금지됨" end,
     prefix = "SCAVENGER: ",
+    spell_requires_rested_xp_s = function(s) return s .. "은(는) 여관이나 도시에서만 시전할 수 있습니다" end,
     trade_activated = "이제 1분 동안 거래할 수 있습니다",
     trade_already_activated = "거래가 이미 1분간 활성화되어 있습니다",
     trade_deactivated = "1분이 지났습니다: 거래가 이제 비활성화되었습니다",
