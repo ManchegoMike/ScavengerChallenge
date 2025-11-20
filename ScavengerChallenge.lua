@@ -16,9 +16,10 @@ local pdb = dbg and print or printnothing
 local _initialized = false
 local _allowMail = false
 local _allowTrade = false
-local _currentMerchantPage = nil    -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
-local _targetingQuestNpc = false    -- Toggled by quest events
-local _itemsInBags = {}             -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
+local _currentMerchantPage = nil                -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
+local _currentMerchantSellsGrimoires = false    -- Does the current merchant sell grimoires?
+local _targetingQuestNpc = false                -- Toggled by quest events
+local _itemsInBags = {}                         -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
 local _hearthTicker
 
 -- Constants -------------------------------------------------------------------
@@ -34,6 +35,17 @@ local MERCHANT_EXCEPTIONS = {
 }
 local ALLOWED_ITEMS = {
     [5175]=1, [5176]=1,  [5177]=1,  [5178]=1, -- earth, fire, water, air totems
+}
+local GRIMOIRE_IDS = { -- I think this is a complete list, but even if not, it's enough for isGrimoireVendor()
+    [16302]=1, [16316]=1, [16317]=1, [16318]=1, [16319]=1, [16320]=1, [16321]=1,
+    [16322]=1, [16323]=1, [16324]=1, [16325]=1, [16326]=1, [16327]=1, [16328]=1,
+    [16329]=1, [16330]=1, [16331]=1, [16346]=1, [16347]=1, [16348]=1, [16349]=1,
+    [16350]=1, [16351]=1, [16352]=1, [16353]=1, [16354]=1, [16355]=1, [16356]=1,
+    [16357]=1, [16358]=1, [16359]=1, [16360]=1, [16361]=1, [16362]=1, [16363]=1,
+    [16364]=1, [16365]=1, [16366]=1, [16368]=1, [16371]=1, [16372]=1, [16373]=1,
+    [16374]=1, [16375]=1, [16376]=1, [16377]=1, [16378]=1, [16379]=1, [16380]=1,
+    [16381]=1, [16382]=1, [16383]=1, [16384]=1, [16385]=1, [16386]=1, [16387]=1,
+    [16388]=1, [16389]=1, [16390]=1,
 }
 
 -- Slash Commands --------------------------------------------------------------
@@ -156,11 +168,11 @@ function ns.parseCommand(str)
             end
 
             if ScavengerUserData.NoexMode then
-                success(L.noex_on)
+                success(L.noex_on())
                 ns.checkEquippedItems()
                 ns.checkBags()
             else
-                success(L.noex_off)
+                success(L.noex_off())
             end
 
             ns.initDB()
@@ -320,6 +332,20 @@ local function showMerchantItem(id)
     return ScavengerUserData.AllowedItems[id]
 end
 
+local function isGrimoireVendor()                                                                   --pdb("isGrimoireVendor()")
+    for i = 1, (GetMerchantNumItems() or 0) do
+        local link = GetMerchantItemLink(i)                                                         --pdb("  ", i, link)
+        if link then
+            local itemId = GetItemInfoInstant(link)                                                 --pdb("  ", itemId)
+            if itemId and GRIMOIRE_IDS[itemId] then                                                 --pdb("TRUE")
+                return true
+            end
+        end
+    end
+    pdb("FALSE")
+    return false
+end
+
 local function hideOrShowMerchantItems(pageNumber)
     -- Only attempt on classic-style Merchant UI (Retail’s new UI may not use these frames)
     if not pageNumber or not MERCHANT_ITEMS_PER_PAGE or not MerchantFrame then return end
@@ -338,7 +364,7 @@ local function hideOrShowMerchantItems(pageNumber)
                 local btn = _G["MerchantItem" .. i]
                 if btn and link then
                     local id = adapter:parseItemLink(link)
-                    if showMerchantItem(id) then
+                    if showMerchantItem(id) or (_currentMerchantSellsGrimoires and not ScavengerUserData.NoexMode) then
                         btn:Show()
                     end
                 end
@@ -437,10 +463,12 @@ end
 
 function EV:MERCHANT_SHOW()
     _currentMerchantPage = 0
+    _currentMerchantSellsGrimoires = isGrimoireVendor()
 end
 
 function EV:MERCHANT_CLOSED()
     _currentMerchantPage = nil
+    _currentMerchantSellsGrimoires = false
 end
 
 -- These are only checked if ScavengerUserData.AllowHearth is false.
