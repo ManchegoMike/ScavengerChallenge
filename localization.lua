@@ -62,7 +62,7 @@ ns["enUS"] = {
     mail_disallowed = "You cannot use mail",
     mail_help = "Allow using mail for one minute (for quests only)",
     noex_help_i = function(level) return "No vendor will sell to you, no exceptions (decide before level " .. level .. ")" end,
-    noex_off = function() return "You can now buy a few vendor items (fishing pole, mining pick, skinning knife, blacksmith hammer, mounts" ..
+    noex_off = function() return "You can now buy a few vendor items (fishing pole, mining pick, skinning knife, blacksmith hammer, mounts, ammo, thrown weapons" ..
         (UnitClassBase("player") == "WARLOCK" and ", grimoires" or "") ..
         ")" end,
     noex_on = function() return "No vendor will sell to you now, no exceptions" end,
