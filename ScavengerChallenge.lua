@@ -18,6 +18,7 @@ local _allowMail = false
 local _allowTrade = false
 local _currentMerchantPage = nil                -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
 local _currentMerchantSellsGrimoires = false    -- Does the current merchant sell grimoires?
+local _currentMerchantIsShadyDealer = false     -- Does the current merchant sell rogue items?
 local _targetingQuestNpc = false                -- Toggled by quest events
 local _itemsInBags = {}                         -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
 local _hearthTicker
@@ -28,15 +29,22 @@ local ERROR_SOUND_FILE = "Interface\\AddOns\\" .. ADDONNAME .. "\\Sounds\\ding.w
 local HEARTHSTONE_ITEM_ID = 6948
 local HEARTHSTONE_SPELL_ID = 8690
 local HEARTHSTONE_SPELL_NAME = GetSpellInfo(HEARTHSTONE_SPELL_ID)
-local TOO_LATE_FOR_CUSTOMIZATION = 6
-local MERCHANT_EXCEPTIONS = {
+local TOO_LATE_FOR_CUSTOMIZATION = 60
+local MERCHANT_EXCEPTIONS = { -- If you have one of these, you must have bought it
     [6256]=1, [2901]=1, [7005]=1, [5956]=1,  -- fishing pole / mining pick / skinning knife / blacksmith hammer
     [2512]=1, [2515]=1, [2516]=1, [2519]=1, [3030]=1, [3033]=1, [11284]=1, [11285]=1, [19316]=1, [19317]=1,  -- projectiles
     [2947]=1, [3111]=1, [2946]=1, [3131]=1, [3107]=1, [3135]=1, [3108]=1, [3137]=1, [15326]=1, [15326]=1,  -- thrown weapons
+    [17031]=1, [17032]=1,  -- rune of tele/portals
     [1132]=1, [2414]=1, [5655]=1, [5656]=1, [5665]=1, [5668]=1, [5864]=1, [5872]=1, [5873]=1, [8563]=1, [8588]=1, [8591]=1, [8592]=1, [8595]=1, [8629]=1, [8631]=1, [8632]=1, [13321]=1, [13322]=1, [13331]=1, [13332]=1, [13333]=1, [15277]=1, [15290]=1, [211498]=1, [211499]=1, [213170]=1, [216492]=1, [216570]=1,  -- mounts
 }
-local ALLOWED_ITEMS = {
+local LOOTABLE_MERCHANT_EXCEPTIONS = { -- If you have one of these, you might have bought or looted it
+    [159]=1, [1179]=1, [1205]=1, [1708]=1, [1645]=1, [19300]=1, [8766]=1,  -- drinks
+}
+local ALLOWED_QUEST_ITEMS = {
     [5175]=1, [5176]=1,  [5177]=1,  [5178]=1, -- earth, fire, water, air totems
+}
+local ROGUE_GOODS_IDS = {
+    [2928]=1, [2930]=1, [5060]=1, [5140]=1, [5173]=1, [8923]=1, [8924]=1,
 }
 local GRIMOIRE_IDS = { -- I think this is a complete list, but even if not, it's enough for isGrimoireVendor()
     [16302]=1, [16316]=1, [16317]=1, [16318]=1, [16319]=1, [16320]=1, [16321]=1,
@@ -48,6 +56,15 @@ local GRIMOIRE_IDS = { -- I think this is a complete list, but even if not, it's
     [16374]=1, [16375]=1, [16376]=1, [16377]=1, [16378]=1, [16379]=1, [16380]=1,
     [16381]=1, [16382]=1, [16383]=1, [16384]=1, [16385]=1, [16386]=1, [16387]=1,
     [16388]=1, [16389]=1, [16390]=1,
+}
+local DRINK_CLASSES = {
+    ['DRUID']=1, ['HUNTER']=1, ['MAGE']=1, ['PRIEST']=1, ['SHAMAN']=1, ['PALADIN']=1, ['WARLOCK']=1,
+}
+local THROWN_CLASSES = {
+    ['HUNTER']=1, ['ROGUE']=1, ['WARRIOR']=1,
+}
+local AMMO_CLASSES = {
+    ['HUNTER']=1, ['ROGUE']=1, ['WARRIOR']=1,
 }
 
 -- Slash Commands --------------------------------------------------------------
@@ -72,6 +89,9 @@ function ns.initDB(force)
     for id,_ in pairs(MERCHANT_EXCEPTIONS) do
         ScavengerUserData.AllowedItems[id] = value
     end
+    for id,_ in pairs(LOOTABLE_MERCHANT_EXCEPTIONS) do
+        ScavengerUserData.AllowedItems[id] = value
+    end
 end
 
 -- Sound wrapper ---------------------------------------------------------------
@@ -88,6 +108,10 @@ local function fail(s)                  print(colorText('ff0000', L.prefix) .. c
 local function success(s)               print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
 local function flash(s,sound)           UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8); if sound ~= false then playError() end end
 local function playerCanCustomize()     return UnitLevel("player") < TOO_LATE_FOR_CUSTOMIZATION end
+
+function ns.playerCanUseDrinks()    return DRINK_CLASSES[UnitClassBase("player")] ~= nil end
+function ns.playerCanUseAmmo()      return AMMO_CLASSES[UnitClassBase("player")] ~= nil end
+function ns.playerCanUseThrown()    return THROWN_CLASSES[UnitClassBase("player")] ~= nil end
 
 -- Command parsing -------------------------------------------------------------
 
@@ -330,22 +354,34 @@ end
 
 -- Merchant filtering (Wrath/Classic UI only) ----------------------------------
 
-local function showMerchantItem(id)
-    return ScavengerUserData.AllowedItems[id]
+local function showMerchantItem(id, class)
+    if ScavengerUserData.AllowedItems[id] then return true end
+    if not ScavengerUserData.NoexMode then
+        if class == "WARLOCK" and _currentMerchantSellsGrimoires then return true end
+        if class == "ROGUE" and _currentMerchantIsShadyDealer then return true end
+    end
+    return false
 end
 
-local function isGrimoireVendor()                                                                   --pdb("isGrimoireVendor()")
+local function doesVendorSellSpecificItems(tbl)
     for i = 1, (GetMerchantNumItems() or 0) do
-        local link = GetMerchantItemLink(i)                                                         --pdb("  ", i, link)
+        local link = GetMerchantItemLink(i)
         if link then
-            local itemId = GetItemInfoInstant(link)                                                 --pdb("  ", itemId)
-            if itemId and GRIMOIRE_IDS[itemId] then                                                 --pdb("TRUE")
+            local itemId = GetItemInfoInstant(link)
+            if itemId and tbl[itemId] then
                 return true
             end
         end
     end
-    pdb("FALSE")
     return false
+end
+
+local function isGrimoireVendor()
+    return doesVendorSellSpecificItems(GRIMOIRE_IDS)
+end
+
+local function isShadyDealer()
+    return doesVendorSellSpecificItems(ROGUE_GOODS_IDS)
 end
 
 local function hideOrShowMerchantItems(pageNumber)
@@ -353,6 +389,7 @@ local function hideOrShowMerchantItems(pageNumber)
     if not pageNumber or not MERCHANT_ITEMS_PER_PAGE or not MerchantFrame then return end
 
     if pageNumber > 0 then
+        local class = UnitClassBase("player")
         -- Hide all buttons
         for i = 1, MERCHANT_ITEMS_PER_PAGE do
             local btn = _G["MerchantItem" .. i]
@@ -366,7 +403,7 @@ local function hideOrShowMerchantItems(pageNumber)
                 local btn = _G["MerchantItem" .. i]
                 if btn and link then
                     local id = adapter:parseItemLink(link)
-                    if showMerchantItem(id) or (_currentMerchantSellsGrimoires and not ScavengerUserData.NoexMode) then
+                    if showMerchantItem(id, class) then
                         btn:Show()
                     end
                 end
@@ -466,11 +503,13 @@ end
 function EV:MERCHANT_SHOW()
     _currentMerchantPage = 0
     _currentMerchantSellsGrimoires = isGrimoireVendor()
+    _currentMerchantIsShadyDealer = isShadyDealer()
 end
 
 function EV:MERCHANT_CLOSED()
     _currentMerchantPage = nil
     _currentMerchantSellsGrimoires = false
+    _currentMerchantIsShadyDealer = false
 end
 
 -- These are only checked if ScavengerUserData.AllowHearth is false.
@@ -607,7 +646,7 @@ local function checkBagsForDifferences(...)
                     if id and not _itemsInBags[id] then
                         -- This is an item we haven't seen before in the bags.
                         _itemsInBags[id] = 1                                                        --pdb("isQuestContext")
-                        if not ALLOWED_ITEMS[id] and isQuestContext then
+                        if not ALLOWED_QUEST_ITEMS[id] and isQuestContext then
                             -- Here we check if the item is a quest item,
                             -- which means it's something required for the
                             -- quest, and is not a quest reward. If it isn't
