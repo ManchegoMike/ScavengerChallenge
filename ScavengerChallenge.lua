@@ -16,11 +16,9 @@ local pdb = dbg and print or printnothing
 local _initialized = false
 local _allowMail = false
 local _allowTrade = false
-local _currentMerchantPage = nil                -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
-local _currentMerchantSellsGrimoires = false    -- Does the current merchant sell grimoires?
-local _currentMerchantIsShadyDealer = false     -- Does the current merchant sell rogue items?
-local _targetingQuestNpc = false                -- Toggled by quest events
-local _itemsInBags = {}                         -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
+local _currentMerchantPage = nil    -- Current page (Wrath/Classic UI); nil when not at merchant; -1 for buyback page
+local _targetingQuestNpc = false    -- Toggled by quest events
+local _itemsInBags = {}             -- A table of all items in bags; when player gets a new item, this is checked to figure out which item is new
 local _hearthTicker
 
 -- Constants -------------------------------------------------------------------
@@ -30,41 +28,8 @@ local HEARTHSTONE_ITEM_ID = 6948
 local HEARTHSTONE_SPELL_ID = 8690
 local HEARTHSTONE_SPELL_NAME = GetSpellInfo(HEARTHSTONE_SPELL_ID)
 local TOO_LATE_FOR_CUSTOMIZATION = 60
-local MERCHANT_EXCEPTIONS = { -- If you have one of these, you must have bought it
-    [6256]=1, [2901]=1, [7005]=1, [5956]=1,  -- fishing pole / mining pick / skinning knife / blacksmith hammer
-    [2512]=1, [2515]=1, [2516]=1, [2519]=1, [3030]=1, [3033]=1, [11284]=1, [11285]=1, [19316]=1, [19317]=1,  -- projectiles
-    [2947]=1, [3111]=1, [2946]=1, [3131]=1, [3107]=1, [3135]=1, [3108]=1, [3137]=1, [15326]=1, [15326]=1,  -- thrown weapons
-    [17031]=1, [17032]=1,  -- rune of tele/portals
-    [1132]=1, [2414]=1, [5655]=1, [5656]=1, [5665]=1, [5668]=1, [5864]=1, [5872]=1, [5873]=1, [8563]=1, [8588]=1, [8591]=1, [8592]=1, [8595]=1, [8629]=1, [8631]=1, [8632]=1, [13321]=1, [13322]=1, [13331]=1, [13332]=1, [13333]=1, [15277]=1, [15290]=1, [211498]=1, [211499]=1, [213170]=1, [216492]=1, [216570]=1,  -- mounts
-}
-local LOOTABLE_MERCHANT_EXCEPTIONS = { -- If you have one of these, you might have bought or looted it
-    [159]=1, [1179]=1, [1205]=1, [1708]=1, [1645]=1, [19300]=1, [8766]=1,  -- drinks
-}
 local ALLOWED_QUEST_ITEMS = {
     [5175]=1, [5176]=1,  [5177]=1,  [5178]=1, -- earth, fire, water, air totems
-}
-local ROGUE_GOODS_IDS = {
-    [2928]=1, [2930]=1, [5060]=1, [5140]=1, [5173]=1, [8923]=1, [8924]=1,
-}
-local GRIMOIRE_IDS = { -- I think this is a complete list, but even if not, it's enough for isGrimoireVendor()
-    [16302]=1, [16316]=1, [16317]=1, [16318]=1, [16319]=1, [16320]=1, [16321]=1,
-    [16322]=1, [16323]=1, [16324]=1, [16325]=1, [16326]=1, [16327]=1, [16328]=1,
-    [16329]=1, [16330]=1, [16331]=1, [16346]=1, [16347]=1, [16348]=1, [16349]=1,
-    [16350]=1, [16351]=1, [16352]=1, [16353]=1, [16354]=1, [16355]=1, [16356]=1,
-    [16357]=1, [16358]=1, [16359]=1, [16360]=1, [16361]=1, [16362]=1, [16363]=1,
-    [16364]=1, [16365]=1, [16366]=1, [16368]=1, [16371]=1, [16372]=1, [16373]=1,
-    [16374]=1, [16375]=1, [16376]=1, [16377]=1, [16378]=1, [16379]=1, [16380]=1,
-    [16381]=1, [16382]=1, [16383]=1, [16384]=1, [16385]=1, [16386]=1, [16387]=1,
-    [16388]=1, [16389]=1, [16390]=1,
-}
-local DRINK_CLASSES = {
-    ['DRUID']=1, ['HUNTER']=1, ['MAGE']=1, ['PRIEST']=1, ['SHAMAN']=1, ['PALADIN']=1, ['WARLOCK']=1,
-}
-local THROWN_CLASSES = {
-    ['HUNTER']=1, ['ROGUE']=1, ['WARRIOR']=1,
-}
-local AMMO_CLASSES = {
-    ['HUNTER']=1, ['ROGUE']=1, ['WARRIOR']=1,
 }
 
 -- Slash Commands --------------------------------------------------------------
@@ -79,19 +44,8 @@ end
 function ns.initDB(force)
     if force or ScavengerUserData == nil then ScavengerUserData = {} end
     if ScavengerUserData.ForbiddenItems == nil then ScavengerUserData.ForbiddenItems = {} end
-    if ScavengerUserData.AllowedItems == nil then ScavengerUserData.AllowedItems = {} end
     if ScavengerUserData.AllowHearth == nil then ScavengerUserData.AllowHearth = false end
     if ScavengerUserData.AllowBank == nil then ScavengerUserData.AllowBank = false end
-    if ScavengerUserData.NoexMode == nil then ScavengerUserData.NoexMode = false end
-
-    local value = nil
-    if not ScavengerUserData.NoexMode then value = 1 end
-    for id,_ in pairs(MERCHANT_EXCEPTIONS) do
-        ScavengerUserData.AllowedItems[id] = value
-    end
-    for id,_ in pairs(LOOTABLE_MERCHANT_EXCEPTIONS) do
-        ScavengerUserData.AllowedItems[id] = value
-    end
 end
 
 -- Sound wrapper ---------------------------------------------------------------
@@ -103,24 +57,22 @@ end
 -- Utility funcs ---------------------------------------------------------------
 
 local function colorText(hex6, s)       return "|cFF" .. hex6 .. s .. "|r" end
-local function info(s)                  print(colorText('c0c0c0', L.prefix) .. colorText('ffffff', s)) end
-local function fail(s)                  print(colorText('ff0000', L.prefix) .. colorText('ffffff', s)) end
-local function success(s)               print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
+local function bad(s)                   print(colorText('ff0000', L.prefix) .. colorText('ffffff', s)) end
+local function good(s)                  print(colorText('0080ff', L.prefix) .. colorText('00ff00', s)) end
 local function flash(s,sound)           UIErrorsFrame:AddMessage(s, 1.0, 0.5, 0.0, GetChatTypeIndex('SYSTEM'), 8); if sound ~= false then playError() end end
 local function playerCanCustomize()     return UnitLevel("player") < TOO_LATE_FOR_CUSTOMIZATION end
-
-function ns.playerCanUseDrinks()    return DRINK_CLASSES[UnitClassBase("player")] ~= nil end
-function ns.playerCanUseAmmo()      return AMMO_CLASSES[UnitClassBase("player")] ~= nil end
-function ns.playerCanUseThrown()    return THROWN_CLASSES[UnitClassBase("player")] ~= nil end
 
 -- Command parsing -------------------------------------------------------------
 
 function ns.parseCommand(str)
+
     local _, _, arg1 = str:find("^allow +(.*)$")
     if arg1 then ns.allowOrDisallowItem(arg1, true, true); return end
 
     _, _, arg1 = str:find("^disallow +(.*)$")
     if arg1 then ns.allowOrDisallowItem(arg1, false, true); return end
+
+    ----
 
     local function setHearth(tf)
         if playerCanCustomize() then
@@ -131,13 +83,13 @@ function ns.parseCommand(str)
             end
 
             if ScavengerUserData.AllowHearth then
-                success(L.hearth_on)
+                good(L.hearth_on)
             else
-                success(L.hearth_off)
+                good(L.hearth_off)
                 ns.checkBags()
             end
         else
-            fail(L.level_too_high)
+            bad(L.level_too_high)
         end
     end
 
@@ -154,6 +106,8 @@ function ns.parseCommand(str)
         return
     end
 
+    ----
+
     local function setBank(tf)
         if playerCanCustomize() then
             if tf == nil then
@@ -163,12 +117,12 @@ function ns.parseCommand(str)
             end
 
             if ScavengerUserData.AllowBank then
-                success(L.bank_on)
+                good(L.bank_on)
             else
-                success(L.bank_off)
+                good(L.bank_off)
             end
         else
-            fail(L.level_too_high)
+            bad(L.level_too_high)
         end
     end
 
@@ -185,76 +139,46 @@ function ns.parseCommand(str)
         return
     end
 
-    local function setNoex(tf)
-        if playerCanCustomize() then
-            if tf == nil then
-                ScavengerUserData.NoexMode = not ScavengerUserData.NoexMode
-            else
-                ScavengerUserData.NoexMode = tf
-            end
-
-            if ScavengerUserData.NoexMode then
-                success(L.noex_on())
-                ns.checkEquippedItems()
-                ns.checkBags()
-            else
-                success(L.noex_off())
-            end
-
-            ns.initDB()
-        else
-            fail(L.level_too_high)
-        end
-    end
-
-    p1, p2, match = str:find("^noex *(%a*)$")
-    if p1 then
-        match = match:lower()
-        if match == 'on' then
-            setNoex(true)
-        elseif match == 'off' then
-            setNoex(false)
-        else
-            setNoex(nil)
-        end
-        return
-    end
+    ----
 
     p1, p2, match = str:find("^mail$")
     if p1 then
         if _allowMail then
-            fail(L.mail_already_activated)
+            bad(L.mail_already_activated)
         else
             _allowMail = true
-            success(L.mail_activated)
+            good(L.mail_activated)
             C_Timer.After(60, function()
                 _allowMail = false
-                success(L.mail_deactivated)
+                good(L.mail_deactivated)
             end)
         end
         return
     end
+
+    ----
 
     p1, p2, match = str:find("^trade$")
     if p1 then
         if _allowTrade then
-            fail(L.trade_already_activated)
+            bad(L.trade_already_activated)
         else
             _allowTrade = true
-            success(L.trade_activated)
+            good(L.trade_activated)
             C_Timer.After(60, function()
                 _allowTrade = false
-                success(L.trade_deactivated)
+                good(L.trade_deactivated)
             end)
         end
         return
     end
 
+    ----
+
     print(' ')
-    success(L.init_desc(ScavengerUserData.NoexMode, ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
+    good(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
     print(' ')
     if playerCanCustomize() then
-        print(colorText('ffff00', "/scav noex")                                 .. " — " .. L.noex_help_i(TOO_LATE_FOR_CUSTOMIZATION))
         print(colorText('ffff00', "/scav hearth")                               .. " — " .. L.hearth_help_i(TOO_LATE_FOR_CUSTOMIZATION))
         print(colorText('ffff00', "/scav bank")                                 .. " — " .. L.bank_help_i(TOO_LATE_FOR_CUSTOMIZATION))
     end
@@ -263,6 +187,7 @@ function ns.parseCommand(str)
     print(colorText('ffff00', "/scav allow {" .. L.id_name_link .. "}")         .. " — " .. L.allow_help)
     print(colorText('ffff00', "/scav disallow {" .. L.id_name_link .. "}")      .. " — " .. L.disallow_help)
     print(' ')
+
 end
 
 -- Item helpers ----------------------------------------------------------------
@@ -270,23 +195,21 @@ end
 function ns.allowOrDisallowItem(itemStr, allow, userCommand)
     local name, link = GetItemInfo(itemStr)
     if not name then
-        fail(L.item_not_found_s(itemStr))
+        bad(L.item_not_found_s(itemStr))
         return false
     end
     local itemId, text = adapter:parseItemLink(link)
     if not itemId or not text then
-        fail(L.bad_item_link_s('"' .. tostring(link) .. '"'))
+        bad(L.bad_item_link_s('"' .. tostring(link) .. '"'))
         return false
     end
 
     if allow then
-        ScavengerUserData.AllowedItems[itemId] = 1
         ScavengerUserData.ForbiddenItems[itemId] = nil
-        if userCommand then info(L.now_allowed_s_i(link, itemId)) end
+        if userCommand then print(L.now_allowed_s_i(link, itemId)) end
     else
-        ScavengerUserData.AllowedItems[itemId] = nil
         ScavengerUserData.ForbiddenItems[itemId] = 1
-        if userCommand then info(L.now_disallowed_s_i(link, itemId)) end
+        if userCommand then print(L.now_disallowed_s_i(link, itemId)) end
     end
     return true
 end
@@ -301,8 +224,6 @@ function ns.equippedItemsWarnings()
             local name, link = GetItemInfo(itemId)
             if ScavengerUserData.ForbiddenItems[itemId] then
                 msgs[#msgs+1] = L.unequip_quest_item_s(link or ("item "..itemId))
-            elseif MERCHANT_EXCEPTIONS[itemId] and ScavengerUserData.NoexMode then
-                msgs[#msgs+1] = L.discard_item_s(link or ("item "..itemId))
             end
         end
     end
@@ -312,9 +233,9 @@ end
 function ns.checkEquippedItems(showMessageIfAllOk)                                                  --pdb("checkEquippedItems", showMessageIfAllOk)
     local msgs = ns.equippedItemsWarnings()
     if #msgs == 0 then
-        if showMessageIfAllOk then success(L.all_equipped_ok) end
+        if showMessageIfAllOk then good(L.all_equipped_ok) end
     else
-        for _, msg in ipairs(msgs) do fail(msg) end
+        for _, msg in ipairs(msgs) do bad(msg) end
         if #msgs == 1 then flash(msgs[1]) else flash(L.unequip_n_quest_items(#msgs)) end
         playError()
     end
@@ -340,12 +261,8 @@ function ns.checkBags()
             local id = adapter:getContainerItemId(bag, slot)
             if id then
                 if id == HEARTHSTONE_ITEM_ID and not ScavengerUserData.AllowHearth then
-                    fail(L.hearth_disallowed)
+                    bad(L.hearth_disallowed)
                     flash(L.hearth_disallowed)
-                elseif MERCHANT_EXCEPTIONS[id] and ScavengerUserData.NoexMode then
-                    local link = adapter:getContainerItemLink(bag, slot)
-                    fail(L.discard_item_s(link))
-                    flash(L.discard_item_s(link))
                 end
             end
         end
@@ -353,36 +270,6 @@ function ns.checkBags()
 end
 
 -- Merchant filtering (Wrath/Classic UI only) ----------------------------------
-
-local function showMerchantItem(id, class)
-    if ScavengerUserData.AllowedItems[id] then return true end
-    if not ScavengerUserData.NoexMode then
-        if class == "WARLOCK" and _currentMerchantSellsGrimoires then return true end
-        if class == "ROGUE" and _currentMerchantIsShadyDealer then return true end
-    end
-    return false
-end
-
-local function doesVendorSellSpecificItems(tbl)
-    for i = 1, (GetMerchantNumItems() or 0) do
-        local link = GetMerchantItemLink(i)
-        if link then
-            local itemId = GetItemInfoInstant(link)
-            if itemId and tbl[itemId] then
-                return true
-            end
-        end
-    end
-    return false
-end
-
-local function isGrimoireVendor()
-    return doesVendorSellSpecificItems(GRIMOIRE_IDS)
-end
-
-local function isShadyDealer()
-    return doesVendorSellSpecificItems(ROGUE_GOODS_IDS)
-end
 
 local function hideOrShowMerchantItems(pageNumber)
     -- Only attempt on classic-style Merchant UI (Retail’s new UI may not use these frames)
@@ -395,20 +282,6 @@ local function hideOrShowMerchantItems(pageNumber)
             local btn = _G["MerchantItem" .. i]
             if btn then btn:Hide() end
         end
-        -- Show buttons for allowed items
-        C_Timer.After(0.05, function()
-            for i = 1, MERCHANT_ITEMS_PER_PAGE do
-                local index = (pageNumber - 1) * MERCHANT_ITEMS_PER_PAGE + i
-                local link = GetMerchantItemLink(index)
-                local btn = _G["MerchantItem" .. i]
-                if btn and link then
-                    local id = adapter:parseItemLink(link)
-                    if showMerchantItem(id, class) then
-                        btn:Show()
-                    end
-                end
-            end
-        end)
     else -- pageNumber <= 0 means the buyback tab
          -- Show all buttons
         for i = 1, 12 do
@@ -444,8 +317,8 @@ function EV:PLAYER_LOGIN()
 
     C_Timer.After(2.0, function()
         _initialized = true
-        success(L.init_desc(ScavengerUserData.NoexMode, ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
-        success(L.init_tip(colorText('ffd000', '/scav')))
+        good(L.init_desc(ScavengerUserData.AllowHearth, ScavengerUserData.AllowBank))
+        good(L.init_tip(colorText('ffd000', '/scav')))
         ns.initItemsInBags()
         ns.checkEquippedItems(true)
         ns.checkBags()
@@ -473,7 +346,7 @@ end
 function EV:BANKFRAME_OPENED()
     if not ScavengerUserData.AllowBank then
         CloseBankFrame()
-        fail(L.bank_disallowed)
+        bad(L.bank_disallowed)
         flash(L.bank_disallowed)
     end
 end
@@ -481,7 +354,7 @@ end
 function EV:MAIL_SHOW()
     if not _allowMail then
         CloseMail()
-        fail(L.mail_disallowed)
+        bad(L.mail_disallowed)
         flash(L.mail_disallowed)
     end
 end
@@ -489,27 +362,23 @@ end
 function EV:TRADE_SHOW()
     if not _allowTrade then
         CancelTrade()
-        fail(L.trade_disallowed)
+        bad(L.trade_disallowed)
         flash(L.trade_disallowed)
     end
 end
 
 function EV:AUCTION_HOUSE_SHOW()
     CloseAuctionHouse()
-    fail(L.auction_disallowed)
+    bad(L.auction_disallowed)
     flash(L.auction_disallowed)
 end
 
 function EV:MERCHANT_SHOW()
     _currentMerchantPage = 0
-    _currentMerchantSellsGrimoires = isGrimoireVendor()
-    _currentMerchantIsShadyDealer = isShadyDealer()
 end
 
 function EV:MERCHANT_CLOSED()
     _currentMerchantPage = nil
-    _currentMerchantSellsGrimoires = false
-    _currentMerchantIsShadyDealer = false
 end
 
 -- These are only checked if ScavengerUserData.AllowHearth is false.
@@ -581,7 +450,7 @@ function EV:UNIT_SPELLCAST_START(unit, a1, a2, a3, a4)
     local msg = forbiddenSpellErrorMessage(a1, a2, a3, a4)                                          --pdb(msg)
     if msg then
         flash(msg)
-        fail(msg)
+        bad(msg)
 
         if _hearthTicker then _hearthTicker:Cancel() end
 
@@ -657,7 +526,7 @@ local function checkBagsForDifferences(...)
                                 if not isQuestItem then
                                     ScavengerUserData.ForbiddenItems[id] = 1
                                     _targetingQuestNpc = false
-                                    fail(L.cannot_equip_s(link))
+                                    bad(L.cannot_equip_s(link))
                                     flash(L.cannot_equip_s(link), false)
                                 end
                             end

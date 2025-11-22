@@ -48,8 +48,7 @@ ns["enUS"] = {
     hearth_on = "Hearthing is now allowed",
     id_name_link = "id/name/link",
     init_base = "Hardcore, self-found, no quest rewards, no buying from vendors",
-    init_desc = function(noex, hearthOK, bankOK) return L.init_base ..
-        (noex and " (no exceptions)" or " (with some exceptions)") ..
+    init_desc = function(hearthOK, bankOK) return L.init_base ..
         (bankOK and ", banking OK" or ", no banking") ..
         (hearthOK and ", hearthing OK" or ", no hearthing") ..
         ((UnitClassBase("player") == "DRUID" and not hearthOK) and (", " .. L.spell_requires_rested_xp_s(GetSpellInfo(18960))) or "") end,
@@ -61,16 +60,6 @@ ns["enUS"] = {
     mail_deactivated = "One minute has elapsed: mail is now deactivated",
     mail_disallowed = "You cannot use mail",
     mail_help = "Allow using mail for one minute (for quests only)",
-    noex_help_i = function(level) return "No vendor will sell to you, no exceptions (decide before level " .. level .. ")" end,
-    noex_off = function() return "You can now buy a few vendor items (fishing pole, mining pick, skinning knife, blacksmith hammer, mounts" ..
-        (ns.playerCanUseDrinks()                and ", drinks"          or "") ..
-        (ns.playerCanUseAmmo()                  and ", ammo"            or "") ..
-        (ns.playerCanUseThrown()                and ", thrown weapons"  or "") ..
-        (UnitClassBase("player") == "WARLOCK"   and ", grimoires"       or "") ..
-        (UnitClassBase("player") == "ROGUE"     and ", rogue reagents"  or "") ..
-        (UnitClassBase("player") == "MAGE"      and ", runes"           or "") ..
-        ")" end,
-    noex_on = function() return "No vendor will sell to you now, no exceptions" end,
     now_allowed_s_i = function(link, id) return link .. " (" .. id .. ") now allowed" end,
     now_disallowed_s_i = function(link, id) return link .. " (" .. id .. ") now disallowed" end,
     prefix = "SCAVENGER: ", -- One space at the end
